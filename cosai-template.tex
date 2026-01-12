@@ -28,6 +28,18 @@ $endif$
 $if(cancel)$
 \usepackage{cancel}
 $endif$
+\usepackage{enumitem}
+\setlistdepth{9}
+\setlist[itemize,1]{label=\textbullet}
+\setlist[itemize,2]{label=--}
+\setlist[itemize,3]{label=*}
+\setlist[itemize,4]{label=\textperiodcentered}
+\setlist[itemize,5]{label=\textbullet}
+\setlist[itemize,6]{label=--}
+\setlist[itemize,7]{label=*}
+\setlist[itemize,8]{label=\textperiodcentered}
+\setlist[itemize,9]{label=\textbullet}
+\renewlist{itemize}{itemize}{9}
 $--
 $-- section numbering
 $--
