@@ -18,7 +18,7 @@
 \definecolor{cosaiWhite}{HTML}{FFFFFF}
 
 % --- Page Geometry ---
-\geometry{letterpaper, margin=1in, bottom=1.2in}
+\geometry{letterpaper, margin=1in, bottom=1.2in, headheight=14pt}
 
 % --- Fonts ---
 % Note: Using standard sans-serif. For exact match, use LuaLaTeX/XeLaTeX with Montserrat.
@@ -44,7 +44,9 @@
 % --- Custom Commands ---
 \newcommand{\makeCoSAICover}[2]{
     \begin{titlepage}
-        \fill[cosaiDarkBlue] (current page.south west) rectangle (current page.north east);
+        \begin{tikzpicture}[remember picture, overlay]
+            \fill[cosaiDarkBlue] (current page.south west) rectangle (current page.north east);
+        \end{tikzpicture}
         \centering
         \vspace*{2cm}
         {\color{cosaiWhite}\fontsize{80}{90}\selectfont CoS\textcolor{cosaiGreen}{AI}\par}
@@ -60,7 +62,7 @@
 
 \newcommand{\sectionIcon}[3]{
     \begin{tcolorbox}[colback=cosaiDarkBlue, colframe=cosaiDarkBlue, width=0.3\textwidth, height=3cm, sharp corners, center upper, valign=center]
-        \color{white} #1 \\ \small #2
+        \leavevmode\color{white} #1 \\ \small #2
     \end{tcolorbox}
 }
 
