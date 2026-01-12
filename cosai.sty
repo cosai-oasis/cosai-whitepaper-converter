@@ -13,9 +13,9 @@
 \RequirePackage{tcolorbox}
 
 % --- Color Palette ---
-\definecolor{cosaiDarkBlue}{HTML}{002033}
-\definecolor{cosaiGreen}{HTML}{6CC24A}
-\definecolor{cosaiWhite}{HTML}{FFFFFF}
+\definecolor{cosaiDarkBlue}{RGB}{17, 38, 64}
+\definecolor{cosaiGreen}{RGB}{49, 97, 71}
+\definecolor{cosaiWhite}{RGB}{255, 255, 255}
 
 % --- Page Geometry ---
 \geometry{letterpaper, margin=1in, bottom=1.2in, headheight=14pt}
@@ -42,11 +42,12 @@
 \newcommand{\makeCoSAICover}[2]{
     \begin{titlepage}
         \begin{tikzpicture}[remember picture, overlay]
-            \fill[cosaiDarkBlue] (current page.south west) rectangle (current page.north east);
+            \shade[top color=cosaiDarkBlue, bottom color=cosaiGreen] (current page.south west) rectangle (current page.north east);
         \end{tikzpicture}
-        \centering
         \vspace*{2cm}
-        {\includegraphics[width=0.8\textwidth]{cosai-logo.png}\par}
+        \noindent
+        {\includegraphics[width=0.72\textwidth]{cosai-logo.png}\par}
+        \centering
         \vfill
         {\color{cosaiWhite}\Huge\bfseries #1\par}
         \vspace{1cm}
