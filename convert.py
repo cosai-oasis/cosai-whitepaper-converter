@@ -18,11 +18,12 @@ def convert_mermaid_to_pdf(mermaid_code, index):
         f.write(mermaid_code)
     
     # Use npx to run mmdc (Mermaid CLI)
-    cmd = ["npx", "-y", "@mermaid-js/mermaid-cli", "-i", tmp_mmd, "-o", tmp_pdf]
+    cmd = ["npx", "-y", "@mermaid-js/mermaid-cli", "-i", tmp_mmd, "-o", tmp_pdf, "-c", "config.json", "-p", "puppeteerConfig.json"]
     
     print(f"Generating diagram {index}...")
     try:
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(["pdfcrop", "--margins", "5", tmp_pdf, tmp_pdf], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as e:
         print(f"Error converting mermaid diagram {index}:")
         print(e.stderr.decode())
@@ -64,6 +65,12 @@ def process_markdown(input_file):
     """
     with open(input_file, "r") as f:
         content = f.read()
+
+    # 0. Remove "Table of Contents" section
+    # Regex to match "# Table of contents" (case insensitive) and the following list
+    # Matches until the next header or end of string
+    toc_pattern = re.compile(r"^#\s*Table of [Cc]ontents.*?(?=^#|\Z)", re.MULTILINE | re.DOTALL)
+    content = toc_pattern.sub("", content)
 
     # 1. Handle Mermaid blocks
     # Regex to find mermaid code blocks: ```mermaid ... ```

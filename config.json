@@ -1,0 +1,11 @@
+{
+    "flowchart": {
+        "useMaxWidth": false
+    },
+    "sequence": {
+        "useMaxWidth": false
+    },
+    "gantt": {
+        "useMaxWidth": false
+    }
+}
