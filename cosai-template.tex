@@ -74,11 +74,15 @@ $endif$
 \author{$for(author)$$author$$sep$ \and $endfor$}
 \date{$date$}
 
+
 \begin{document}
 $if(has-frontmatter)$
 \frontmatter
 $endif$
 \makeCoSAICover{$title$}{$author$}
+\newpage
+\tableofcontents
+
 $if(abstract)$
 \newpage
 \section*{Abstract}
