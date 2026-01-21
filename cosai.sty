@@ -46,16 +46,19 @@
     \begin{titlepage}
         \begin{tikzpicture}[remember picture, overlay]
             \shade[top color=cosaiDarkBlue, bottom color=cosaiGreen] (current page.south west) rectangle (current page.north east);
+            % Logo
+            \node[anchor=north west, xshift=1in, yshift=-2.5cm] at (current page.north west) {
+                \includegraphics[width=0.72\textwidth]{cosai-logo.png}
+            };
+            % Title
+            \node[text=white, text width=0.8\textwidth, align=center, font=\Huge\bfseries] at (current page.center) {
+                #1
+            };
+            % Author
+            \node[text=white, text width=0.8\textwidth, align=center, font=\Large, yshift=-3cm] at (current page.center) {
+                #2
+            };
         \end{tikzpicture}
-        \vspace*{2cm}
-        \noindent
-        {\includegraphics[width=0.72\textwidth]{cosai-logo.png}\par}
-        \centering
-        \vfill
-        {\color{cosaiWhite}\Huge\bfseries #1\par}
-        \vspace{1cm}
-        {\color{cosaiWhite}\Large #2\par}
-        \vspace*{2cm}
     \end{titlepage}
 }
 
@@ -71,4 +74,4 @@
   {}
   {0pt}
   {}
-  [{\color{cosaiGreen}\titlerule[1pt]}]
+  [{\color{cosaiGreen}\makebox[0.75\textwidth][l]{\rule{0.75\textwidth}{1pt}}}]
