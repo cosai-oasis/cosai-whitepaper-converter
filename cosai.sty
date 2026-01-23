@@ -11,11 +11,12 @@
 \RequirePackage{tikz}
 \RequirePackage{hyperref}
 \RequirePackage{tcolorbox}
+\RequirePackage[extralight]{plex-sans}
 
 \RequirePackage{caption}
 \captionsetup[figure]{
     font=small,
-    labelfont={bf,color=cosaiDarkBlue},
+    labelfont={color=cosaiDarkBlue},
     textfont=it,
     justification=centering,
     skip=10pt
@@ -36,8 +37,17 @@
 \geometry{letterpaper, margin=1in, bottom=1.2in, headheight=14pt}
 
 % --- Fonts ---
-% Note: Using standard sans-serif. For exact match, use LuaLaTeX/XeLaTeX with Montserrat.
+% Using IBM Plex Sans ExtraLight as the default font family
 \renewcommand{\familydefault}{\sfdefault}
+% Force extralight weight globally
+\AtBeginDocument{%
+  \fontseries{el}\selectfont
+}
+
+% Redefine bold commands to use regular (medium) weight instead of bold
+% This makes \textbf and \bfseries use regular weight
+\renewcommand{\bfseries}{\fontseries{m}\selectfont}
+\DeclareTextFontCommand{\textbf}{\fontseries{m}\selectfont}
 
 % --- Header & Footer ---
 \pagestyle{fancy}
@@ -53,7 +63,9 @@
         };
     \end{tikzpicture}
 }
+\makeatletter
 \fancyfoot[L]{\footnotesize \textcolor{gray}{\@title}}
+\makeatother
 \fancyfoot[R]{\footnotesize \thepage}
 
 % --- Custom Commands ---
@@ -63,35 +75,35 @@
             \shade[top color=cosaiDarkBlue, bottom color=cosaiGreen] (current page.south west) rectangle (current page.north east);
             % Logo
             \node[anchor=north west, xshift=1in, yshift=-2.5cm] at (current page.north west) {
-                \includegraphics[width=0.72\textwidth]{cosai-logo.png}
+                \includegraphics[width=0.72\textwidth]{CoSAI(Light).pdf}
             };
             % Title
             \node[
                 text=white,
                 text width=0.8\textwidth,
                 align=left,
-                font=\fontsize{30}{70}\selectfont\bfseries,
+                font=\fontsize{30}{30}\selectfont,
                 yshift=3cm,
                 xshift=-1cm
                 ] at (current page.center) {
-                \MakeUppercase{#1}
+                % {\hyphenchar\font=-1 \MakeUppercase{#1}}
+                {\hyphenchar\font=-1 #1}
             };
             
             \draw[
                 white,
                 line width=5pt,
                 cap=round
-                ] ([yshift=0cm, xshift=-4cm]current page.center) -- ++(0.9\textwidth, 0);
-
+                ] ([yshift=-2cm, xshift=-4cm]current page.center) -- ++(0.9\textwidth, 0);
             % Author
             \node[
                 text=white,
                 text width=0.8\textwidth,
                 align=left,
                 font=\Large,
-                yshift=-3cm,
+                yshift=3cm,
                 xshift=-1cm,
-                ] at (current page.center) {
+                ] at (current page.south) {
                 #2
             };
         \end{tikzpicture}
@@ -106,7 +118,7 @@
 
 % --- Section Styling ---
 \titleformat{\section}
-  {\color{cosaiDarkBlue}\normalfont\Large\bfseries}
+  {\color{cosaiDarkBlue}\fontseries{el}\selectfont\Large}
   {}
   {0pt}
   {}

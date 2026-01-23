@@ -48,8 +48,9 @@ $if(numbersections)$
 $else$
 \setcounter{secnumdepth}{-\maxdimen} % remove section numbering
 $endif$
-$fonts.latex()$
-$font-settings.latex()$
+$-- Commented out to preserve cosai.sty font settings
+$-- fonts.latex()$
+$-- font-settings.latex()$
 $common.latex()$
 $for(header-includes)$
 $header-includes$
@@ -71,6 +72,7 @@ $if(pdf-trailer-id)$
 $endif$
 
 \title{$title$$if(thanks)$\thanks{$thanks$}$endif$}
+% \title{foobar}
 \author{$for(author)$$author$$sep$ \and $endfor$}
 \date{$date$}
 

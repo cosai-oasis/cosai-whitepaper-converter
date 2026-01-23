@@ -93,6 +93,11 @@ def process_markdown(input_file):
     toc_pattern = re.compile(r"^#\s*Table of [Cc]ontents.*?(?=^#|\Z)", re.MULTILINE | re.DOTALL)
     content = toc_pattern.sub("", content)
 
+    # 0.5. Convert HTML anchor tags to Markdown anchors
+    # Replace <a id="anchor-name"></a> with []{#anchor-name}
+    anchor_pattern = re.compile(r'<a id="([^"]+)"></a>')
+    content = anchor_pattern.sub(r'[]{#\1}', content)
+
     # 1. Handle Mermaid blocks
     # Regex to find mermaid code blocks: ```mermaid ... ```
     mermaid_pattern = re.compile(r"```mermaid\n(.*?)```", re.DOTALL)
@@ -141,6 +146,7 @@ def main():
     parser = argparse.ArgumentParser(description="Convert Markdown to PDF with Mermaid support.")
     parser.add_argument("input_file", help="Path to input Markdown file")
     parser.add_argument("output_file", help="Path to output PDF file")
+    # Override the Markdown header
     parser.add_argument("--title", help="Document title", default="")
     parser.add_argument("--author", help="Document author(s)", default="")
     parser.add_argument("--date", help="Document date", default="")
@@ -186,10 +192,10 @@ def main():
     except FileNotFoundError:
         print("Error: pandoc not found.")
         print("Make sure pandoc is installed and in your PATH.")
-    finally:
-        # Cleanup temp markdown
-        if os.path.exists(tmp_md_path):
-            os.remove(tmp_md_path)
+    # finally:
+    #     # Cleanup temp markdown
+    #     if os.path.exists(tmp_md_path):
+    #         os.remove(tmp_md_path)
             
     # Optional logic to cleanup generated PDFs/Images could go here
     # but based on previous behaviour we leave them for now.
