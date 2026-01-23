@@ -12,6 +12,21 @@
 \RequirePackage{hyperref}
 \RequirePackage{tcolorbox}
 
+\RequirePackage{caption}
+\captionsetup[figure]{
+    font=small,
+    labelfont={bf,color=cosaiDarkBlue},
+    textfont=it,
+    justification=centering,
+    skip=10pt
+}
+
+% --- Figure Centering ---
+% Make all figures centered by default
+\makeatletter
+\g@addto@macro\@floatboxreset\centering
+\makeatother
+
 % --- Color Palette ---
 \definecolor{cosaiDarkBlue}{RGB}{17, 38, 64}
 \definecolor{cosaiGreen}{RGB}{49, 97, 71}
@@ -51,11 +66,32 @@
                 \includegraphics[width=0.72\textwidth]{cosai-logo.png}
             };
             % Title
-            \node[text=white, text width=0.8\textwidth, align=center, font=\Huge\bfseries] at (current page.center) {
-                #1
+            \node[
+                text=white,
+                text width=0.8\textwidth,
+                align=left,
+                font=\fontsize{30}{70}\selectfont\bfseries,
+                yshift=3cm,
+                xshift=-1cm
+                ] at (current page.center) {
+                \MakeUppercase{#1}
             };
+            
+            \draw[
+                white,
+                line width=5pt,
+                cap=round
+                ] ([yshift=0cm, xshift=-4cm]current page.center) -- ++(0.9\textwidth, 0);
+
             % Author
-            \node[text=white, text width=0.8\textwidth, align=center, font=\Large, yshift=-3cm] at (current page.center) {
+            \node[
+                text=white,
+                text width=0.8\textwidth,
+                align=left,
+                font=\Large,
+                yshift=-3cm,
+                xshift=-1cm,
+                ] at (current page.center) {
                 #2
             };
         \end{tikzpicture}

@@ -84,7 +84,7 @@ def process_markdown(input_file):
         
         if pdf_filename:
             diagram_count += 1
-            return f"![Diagram {diagram_count-1}]({pdf_filename})"
+            return f"![ ]({pdf_filename})"
         else:
             return match.group(0) # distinct failure, keep original
 
@@ -117,6 +117,9 @@ def main():
     parser = argparse.ArgumentParser(description="Convert Markdown to PDF with Mermaid support.")
     parser.add_argument("input_file", help="Path to input Markdown file")
     parser.add_argument("output_file", help="Path to output PDF file")
+    parser.add_argument("--title", help="Document title", default="")
+    parser.add_argument("--author", help="Document author(s)", default="")
+    parser.add_argument("--date", help="Document date", default="")
     
     args = parser.parse_args()
     
@@ -135,11 +138,20 @@ def main():
     cmd = [
         "pandoc",
         tmp_md_path,
-        "-o", args.output_file,
+        # "-s",
+        "-o", args.output_file,# + ".tex",
         "--template=cosai-template.tex",
         "--pdf-engine=pdflatex",
-        "--syntax-highlighting=idiomatic" # Replaced deprecated --listings
+        "--syntax-highlighting=idiomatic"
     ]
+    
+    # Add metadata variables if provided
+    if args.title:
+        cmd.extend(["-V", f"title={args.title}"])
+    if args.author:
+        cmd.extend(["-V", f"author={args.author}"])
+    if args.date:
+        cmd.extend(["-V", f"date={args.date}"])
     print(f'Running command: {cmd}')
     try:
         subprocess.run(cmd, check=True)
