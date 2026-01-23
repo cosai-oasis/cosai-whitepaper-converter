@@ -7,15 +7,36 @@ import tempfile
 import argparse
 import urllib.request
 
+def extract_mermaid_title(mermaid_code):
+    """
+    Extracts the title from a mermaid diagram if present.
+    Returns tuple: (title, code_without_title)
+    """
+    # Match title in format: title: "Title Text" or title "Title Text"
+    title_pattern = re.compile(r'^\s*title[:\s]+"([^"]+)"', re.MULTILINE)
+    match = title_pattern.search(mermaid_code)
+    
+    if match:
+        title = match.group(1)
+        # Remove the title line from the code
+        code_without_title = title_pattern.sub('', mermaid_code)
+        return title, code_without_title
+    
+    return None, mermaid_code
+
 def convert_mermaid_to_pdf(mermaid_code, index):
     """
     Converts a mermaid code block to a PDF file using mermaid-cli.
+    Returns tuple: (pdf_filename, title)
     """
+    # Extract title before conversion
+    title, code_without_title = extract_mermaid_title(mermaid_code)
+    
     tmp_mmd = f"diagram_{index}.mmd"
     tmp_pdf = f"diagram_{index}.pdf"
     
     with open(tmp_mmd, "w") as f:
-        f.write(mermaid_code)
+        f.write(code_without_title)
     
     # Use npx to run mmdc (Mermaid CLI)
     cmd = ["npx", "-y", "@mermaid-js/mermaid-cli", "-i", tmp_mmd, "-o", tmp_pdf, "-c", "config.json", "-p", "puppeteerConfig.json"]
@@ -27,12 +48,12 @@ def convert_mermaid_to_pdf(mermaid_code, index):
     except subprocess.CalledProcessError as e:
         print(f"Error converting mermaid diagram {index}:")
         print(e.stderr.decode())
-        return None
+        return None, None
     finally:
         if os.path.exists(tmp_mmd):
             os.remove(tmp_mmd)
             
-    return tmp_pdf
+    return tmp_pdf, title
 
 def download_image(url, index):
     """
@@ -77,16 +98,19 @@ def process_markdown(input_file):
     mermaid_pattern = re.compile(r"```mermaid\n(.*?)```", re.DOTALL)
     
     diagram_count = 0
+
     def mermaid_replacer(match):
         nonlocal diagram_count
         mermaid_code = match.group(1)
-        pdf_filename = convert_mermaid_to_pdf(mermaid_code, diagram_count)
+        pdf_filename, title = convert_mermaid_to_pdf(mermaid_code, diagram_count)
         
         if pdf_filename:
             diagram_count += 1
-            return f"![ ]({pdf_filename})"
+            # Use extracted title as caption, or default to empty
+            caption = title if title else ""
+            return f"![{caption}]({pdf_filename})"
         else:
-            return match.group(0) # distinct failure, keep original
+            return match.group(0)  # distinct failure, keep original
 
     content = mermaid_pattern.sub(mermaid_replacer, content)
 
