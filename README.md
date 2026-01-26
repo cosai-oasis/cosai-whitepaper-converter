@@ -70,4 +70,4 @@ Testing several markdown files has revealed a few best practices or things to no
 1. Any break, `<br>`, and variants, are converted to `\newline`. Errant `<br>` will break the LaTeX compilation. If you get an error about `\newline`, try this.
 
 ## Known Issues
-1. Currently there is an issue where some formatted text, such as ``**I want this bold**` will not be converted to a `\textbf` and will not not be bold. So far, this has only been observed in Markdown Tables.
+1. Currently there is an issue where some formatted text, such as `**I want this bold**` will not be converted to a `\textbf` and will not not be bold. So far, this has only been observed in Markdown Tables.
