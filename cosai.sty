@@ -140,11 +140,11 @@
             % Title
             \node[
                 text=white,
-                text width=0.8\textwidth,
+                text width=1.0\textwidth,
                 align=left,
                 font=\fontseries{\coverTitleWeight}\fontsize{\coverTitleSize}{\coverTitleSize}\selectfont,
                 yshift=3cm,
-                xshift=-1cm
+                xshift=0cm
                 ] at (current page.center) {
                 {\hyphenchar\font=-1 #1}
             };
@@ -161,29 +161,29 @@
                 align=left,
                 font=\fontseries{\coverAuthorWeight}\coverAuthorSize,
                 yshift=3cm,
-                xshift=-1cm,
+                xshift=0cm,
                 ] at (current page.south) {
                 {\hyphenchar\font=-1 #2}
             };
 
             \node[
                 text=white,
-                text width=0.8\textwidth,
+                text width=1.0\textwidth,
                 align=right,
                 font=\fontseries{\coverAuthorWeight}\coverAuthorSize,
                 yshift=1cm,
-                xshift=3.5cm,
+                xshift=0cm,
                 ] at (current page.south) {
                 {\hyphenchar\font=-1 #3}
             };
 
             \node[
                 text=gray,
-                text width=0.8\textwidth,
+                text width=1.0\textwidth,
                 align=left,
                 font=\fontseries{\coverAuthorWeight}\footnotesize,
                 yshift=1cm,
-                xshift=-1cm,
+                xshift=0cm,
                 ] at (current page.south) {
                 {\hyphenchar\font=-1 Version #4}
             };
