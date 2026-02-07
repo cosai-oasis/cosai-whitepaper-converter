@@ -1,0 +1,28 @@
+{
+"pdflatex": {
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+      "whitepaper-converter": {
+        "latexEngine": "pdflatex"
+      }
+    }
+  },
+  "skip_python": {
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+      "whitepaper-converter": {
+        "skipPython": true
+      }
+    }
+  },
+  "minimal": {
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+      "whitepaper-converter": {
+        "skipChromium": true,
+        "skipPython": true,
+        "skipNode": true
+      }
+    }
+  }
+}

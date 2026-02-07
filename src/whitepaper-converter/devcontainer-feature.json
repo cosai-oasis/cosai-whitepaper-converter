@@ -1,0 +1,36 @@
+{
+  "id": "whitepaper-converter",
+  "version": "0.1.0",
+  "name": "CoSAI Whitepaper Converter",
+  "description": "Dependencies for converting Markdown to PDF with CoSAI branding",
+  "options": {
+    "latexEngine": {
+      "type": "string",
+      "default": "tectonic",
+      "proposals": ["tectonic", "pdflatex", "xelatex", "lualatex"],
+      "description": "LaTeX engine to install"
+    },
+    "skipChromium": {
+      "type": "boolean",
+      "default": false,
+      "description": "Skip Chromium configuration"
+    },
+    "skipPython": {
+      "type": "boolean",
+      "default": false,
+      "description": "Skip Python installation"
+    },
+    "skipNode": {
+      "type": "boolean",
+      "default": false,
+      "description": "Skip Node.js installation"
+    }
+  },
+  "containerEnv": {
+    "COSAI_CONVERTER_INSTALLED": "true"
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/python",
+    "ghcr.io/devcontainers/features/node"
+  ]
+}

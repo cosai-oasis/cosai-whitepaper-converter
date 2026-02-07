@@ -1,0 +1,226 @@
+name: Publish Devcontainer Feature
+
+on:
+  push:
+    tags:
+      - 'feature-v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (skip actual publish)'
+        type: boolean
+        default: false
+
+jobs:
+  # Fast manifest and version validation (~1 min)
+  validate:
+    name: Validate Manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract feature version from tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/feature-v')
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/feature-v}
+          echo "version=$TAG" >> $GITHUB_OUTPUT
+          echo "Feature version: $TAG"
+
+      - name: Verify feature manifest exists
+        run: |
+          if [ ! -f src/whitepaper-converter/devcontainer-feature.json ]; then
+            echo "ERROR: Feature manifest not found"
+            exit 1
+          fi
+          echo "Feature manifest found"
+
+      - name: Validate feature manifest JSON
+        run: |
+          cat src/whitepaper-converter/devcontainer-feature.json | jq empty
+          echo "Feature manifest is valid JSON"
+
+      - name: Check feature version is valid semver
+        run: |
+          MANIFEST_VERSION=$(jq -r .version src/whitepaper-converter/devcontainer-feature.json)
+          if ! [[ "$MANIFEST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: Invalid version format: $MANIFEST_VERSION"
+            exit 1
+          fi
+          echo "Version is valid: $MANIFEST_VERSION"
+
+      - name: Check feature version matches tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/feature-v')
+        run: |
+          MANIFEST_VERSION=$(jq -r .version src/whitepaper-converter/devcontainer-feature.json)
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+
+          if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
+            echo "ERROR: Version mismatch!"
+            echo "  Tag version:      $TAG_VERSION"
+            echo "  Manifest version: $MANIFEST_VERSION"
+            exit 1
+          fi
+
+          echo "Version matches: $MANIFEST_VERSION"
+
+  # Full install script tests (reusable workflow)
+  test-install:
+    name: Test Install Scripts
+    uses: ./.github/workflows/test-install.yaml
+
+  # Devcontainer CLI scenario tests (reusable workflow)
+  test-feature:
+    name: Test Feature Scenarios
+    uses: ./.github/workflows/test-feature.yaml
+
+  # Publish to GitHub Container Registry
+  publish:
+    name: Publish to GHCR
+    runs-on: ubuntu-latest
+    needs: [validate, test-install, test-feature]
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract feature version
+        id: version
+        run: |
+          VERSION=$(jq -r .version src/whitepaper-converter/devcontainer-feature.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Feature version: $VERSION"
+
+      - name: Log in to GitHub Container Registry
+        if: inputs.dry_run != true
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bundle scripts into feature
+        run: |
+          # Copy scripts into feature directory so they're included in the package
+          # This ensures the published feature is self-contained
+          mkdir -p src/whitepaper-converter/scripts
+          cp scripts/install-deps.sh src/whitepaper-converter/scripts/
+          cp scripts/verify-deps.sh src/whitepaper-converter/scripts/
+          cp scripts/configure-chromium.sh src/whitepaper-converter/scripts/
+          echo "Scripts bundled into feature directory"
+
+      # oci-registry is just the registry host. The devcontainers/action
+      # automatically appends github.repository as the namespace, producing:
+      # ghcr.io/{owner}/{repo}/{feature-id}
+      - name: Publish devcontainer feature
+        if: inputs.dry_run != true
+        uses: devcontainers/action@v1
+        with:
+          publish-features: true
+          base-path-to-features: src
+          oci-registry: ghcr.io
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dry run - skip publish
+        if: inputs.dry_run == true
+        run: |
+          echo "DRY RUN MODE - Skipping actual publish"
+          echo "Would publish feature to:"
+          echo "  Registry: ghcr.io/${{ github.repository }}"
+          echo "  Feature: whitepaper-converter"
+          echo "  Version: ${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/feature-v') && inputs.dry_run != true
+        uses: softprops/action-gh-release@v2
+        with:
+          body: |
+            ## Feature Published Successfully
+
+            **Feature**: whitepaper-converter
+            **Version**: ${{ steps.version.outputs.version }}
+            **Registry**: ghcr.io/${{ github.repository }}
+
+            ### Usage
+
+            Add to your `.devcontainer/devcontainer.json`:
+
+            ```json
+            {
+              "features": {
+                "ghcr.io/${{ github.repository }}/whitepaper-converter:${{ steps.version.outputs.version }}": {
+                  "latexEngine": "tectonic"
+                }
+              }
+            }
+            ```
+
+            ### Options
+
+            - `latexEngine`: tectonic (default), pdflatex, xelatex, lualatex
+            - `skipChromium`: Skip Chromium configuration (default: false)
+            - `skipPython`: Skip Python installation (default: false)
+            - `skipNode`: Skip Node.js installation (default: false)
+
+            ### Links
+
+            - [Feature Source](https://github.com/${{ github.repository }}/tree/main/src/whitepaper-converter)
+            - [Documentation](https://github.com/${{ github.repository }}/blob/main/src/whitepaper-converter/README.md)
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Notify on completion
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [validate, test-install, test-feature, publish]
+    if: always()
+    steps:
+      - name: Check workflow status
+        run: |
+          # Treat success and skipped as acceptable outcomes
+          if [ "${{ needs.validate.result }}" != "failure" ] && \
+             [ "${{ needs.validate.result }}" != "cancelled" ] && \
+             [ "${{ needs.test-install.result }}" != "failure" ] && \
+             [ "${{ needs.test-install.result }}" != "cancelled" ] && \
+             [ "${{ needs.test-feature.result }}" != "failure" ] && \
+             [ "${{ needs.test-feature.result }}" != "cancelled" ] && \
+             [ "${{ needs.publish.result }}" != "failure" ] && \
+             [ "${{ needs.publish.result }}" != "cancelled" ]; then
+            echo "SUCCESS: Feature published successfully"
+            echo "status=success" >> $GITHUB_ENV
+            echo "exit_code=0" >> $GITHUB_ENV
+          else
+            echo "FAILURE: Workflow failed"
+            echo "  Validate result:      ${{ needs.validate.result }}"
+            echo "  Test install result:  ${{ needs.test-install.result }}"
+            echo "  Test feature result:  ${{ needs.test-feature.result }}"
+            echo "  Publish result:       ${{ needs.publish.result }}"
+            echo "status=failure" >> $GITHUB_ENV
+            echo "exit_code=1" >> $GITHUB_ENV
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ env.status }}" = "success" ]; then
+            echo "✅ Devcontainer feature published successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "View the published feature at:" >> $GITHUB_STEP_SUMMARY
+            echo "https://github.com/${{ github.repository }}/pkgs/container/whitepaper-converter" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Feature publish failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the workflow logs for details." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Exit with failure if workflow failed
+        if: env.exit_code == '1'
+        run: exit 1

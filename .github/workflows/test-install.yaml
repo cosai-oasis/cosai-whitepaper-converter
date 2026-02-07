@@ -1,0 +1,131 @@
+name: Test Install Scripts
+
+on:
+  push:
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/test-install.yaml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/test-install.yaml'
+  workflow_call:
+
+jobs:
+  test-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test verify-deps.sh detects missing deps
+        run: |
+          # Should fail on clean runner (detects missing dependencies)
+          if bash ./scripts/verify-deps.sh; then
+            echo "ERROR: Expected failure on clean system (missing dependencies)"
+            exit 1
+          fi
+          echo "SUCCESS: verify-deps.sh correctly detected missing dependencies"
+
+  test-install-ubuntu:
+    runs-on: ubuntu-latest
+    needs: test-verify
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        engine: [tectonic, pdflatex, default]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run install script
+        run: |
+          if [ "${{ matrix.engine }}" != "default" ]; then
+            LATEX_ENGINE=${{ matrix.engine }} bash ./scripts/install-deps.sh
+          else
+            bash ./scripts/install-deps.sh
+          fi
+
+      - name: Verify installation
+        run: |
+          if [ "${{ matrix.engine }}" != "default" ]; then
+            LATEX_ENGINE=${{ matrix.engine }} bash ./scripts/verify-deps.sh
+          else
+            bash ./scripts/verify-deps.sh
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Test conversion
+        run: |
+          echo '---
+          title: Test Document
+          author: Test Author
+          date: 2025-01-29
+          ---
+          # Hello World
+
+          This is a test document.
+
+          ## Section 1
+
+          Testing basic conversion.
+          ' > /tmp/test.md
+          if [ "${{ matrix.engine }}" != "default" ]; then
+            LATEX_ENGINE=${{ matrix.engine }} python convert.py /tmp/test.md /tmp/test.pdf
+          else
+            python convert.py /tmp/test.md /tmp/test.pdf
+          fi
+
+      - name: Verify PDF was created
+        run: |
+          if [ ! -f /tmp/test.pdf ]; then
+            echo "ERROR: PDF was not created"
+            exit 1
+          fi
+          size=$(stat -c%s /tmp/test.pdf 2>/dev/null || stat -f%z /tmp/test.pdf)
+          if [ "$size" -lt 1024 ]; then
+            echo "ERROR: PDF is too small ($size bytes)"
+            exit 1
+          fi
+          echo "SUCCESS: PDF created ($size bytes)"
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conversion-failure-${{ matrix.engine }}
+          path: |
+            /tmp/test.md
+            /tmp/test.pdf
+          if-no-files-found: ignore
+
+  test-install-macos:
+    runs-on: macos-latest
+    needs: test-verify
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run install script
+        run: bash ./scripts/install-deps.sh
+
+      - name: Verify installation
+        run: bash ./scripts/verify-deps.sh
+
+  test-install-macos-arm64:
+    runs-on: macos-14
+    needs: test-verify
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run install script
+        run: bash ./scripts/install-deps.sh
+
+      - name: Verify installation
+        run: bash ./scripts/verify-deps.sh
