@@ -1,135 +1,313 @@
+"""CoSAI Whitepaper Converter - Transform Markdown to branded PDFs.
+
+This module provides the main conversion pipeline for transforming Markdown
+files into professionally formatted PDFs with CoSAI branding. It handles:
+- Mermaid diagram rendering to SVG
+- Remote image downloading
+- Unicode normalization for different LaTeX engines
+- HTML to LaTeX conversion (br tags, anchors)
+- Table of contents generation
+"""
+
 import sys
 import os
 import re
-import subprocess
 import shutil
+import subprocess
 import tempfile
 import argparse
 import urllib.request
 import frontmatter
+import json
 from typing import Iterable
 
+# LaTeX engine configuration constants
+VALID_LATEX_ENGINES = ["tectonic", "pdflatex", "xelatex", "lualatex"]
+DEFAULT_LATEX_ENGINE = "tectonic"
+CONFIG_FILE_NAME = "converter_config.json"
 
-def extract_mermaid_title(mermaid_code):
+
+def get_asset_path(filename: str) -> str:
     """
-    Extracts the title from a mermaid diagram if present.
-    Returns tuple: (title, code_without_title)
+    Get asset path, checking assets/ first, then root for backward compat.
+
+    Args:
+        filename: Name of the asset file
+
+    Returns:
+        Absolute path to the asset file
     """
-    # Match title in format: title: "Title Text" or title "Title Text"
-    # title_pattern = re.compile(r'^\s*title[:\s]+"([^"]+)"', re.MULTILINE)
-    # match = title_pattern.search(mermaid_code)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    assets_path = os.path.join(script_dir, "assets", filename)
+    if os.path.exists(assets_path):
+        return assets_path
+    return os.path.join(script_dir, filename)  # fallback
+
+
+def normalize_unicode_for_latex(content: str, engine: str | None) -> str:
+    """
+    Normalize Unicode characters for LaTeX compatibility.
+
+    For pdflatex, replaces Unicode punctuation with LaTeX commands.
+    For Unicode engines (tectonic, xelatex, lualatex), returns content unchanged.
+
+    Args:
+        content: Text content to normalize
+        engine: LaTeX engine name (case-insensitive). If None, empty, or unknown,
+                preserves Unicode (safe default for modern engines).
+
+    Returns:
+        Content with Unicode characters normalized for the specified engine.
+    """
+    # Safe default: preserve Unicode for unknown/None/empty engines
+    if not engine or engine.lower() not in ("pdflatex",):
+        return content
+
+    replacements = {
+        "\u2026": r"\ldots{}",  # … ellipsis
+        "\u2019": "'",  # ' right single quote
+        "\u2018": "`",  # ' left single quote
+        "\u201c": "``",  # " left double quote
+        "\u201d": "''",  # " right double quote
+        "\u2014": "---",  # — em dash
+        "\u2013": "--",  # – en dash
+        "\u00a0": "~",  # non-breaking space
+    }
+
+    # Replacement order is safe - no single-char replacements overlap or conflict
+    for char, replacement in replacements.items():
+        content = content.replace(char, replacement)
+    return content
+
+
+def load_converter_config(config_path: str | None = None) -> dict:
+    """
+    Load converter configuration from JSON file.
+
+    Args:
+        config_path: Path to configuration file (converter_config.json)
+
+    Returns:
+        Configuration dictionary or empty dict if file missing/invalid
+    """
+    if config_path is None:
+        return {}
+
+    try:
+        with open(config_path, "r") as f:
+            content = f.read().strip()
+            if not content:
+                return {}
+            return json.loads(content)
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def get_latex_engine(
+    cli_engine: str | None = None, config_path: str | None = None
+) -> str:
+    """
+    Determine LaTeX engine based on priority: CLI > env var > config file > default.
+
+    Args:
+        cli_engine: Engine specified via CLI argument
+        config_path: Path to configuration file
+
+    Returns:
+        Name of LaTeX engine to use (lowercase, validated)
+
+    Raises:
+        ValueError: If specified engine is not valid
+    """
+    engine = None
+
+    # Priority 1: CLI argument (empty string treated as None)
+    if cli_engine is not None and cli_engine.strip():
+        engine = cli_engine.strip().lower()
+
+    # Priority 2: Environment variable
+    if engine is None:
+        env_engine = os.environ.get("LATEX_ENGINE")
+        if env_engine is not None and env_engine.strip():
+            engine = env_engine.strip().lower()
+
+    # Priority 3: Configuration file
+    if engine is None:
+        config = load_converter_config(config_path)
+        if "latex_engine" in config:
+            config_engine = config["latex_engine"]
+            if config_engine is not None and str(config_engine).strip():
+                engine = str(config_engine).strip().lower()
+
+    # Priority 4: Default value
+    if engine is None:
+        engine = DEFAULT_LATEX_ENGINE
+
+    # Validate engine
+    if engine not in VALID_LATEX_ENGINES:
+        raise ValueError(
+            f"Invalid LaTeX engine '{engine}'. "
+            f"Valid engines: {', '.join(VALID_LATEX_ENGINES)}"
+        )
+
+    return engine
+
+
+def extract_mermaid_title(mermaid_code: str) -> tuple[str | None, str]:
+    """Extract the title from a Mermaid diagram if present.
+
+    Also applies the CoSAI theme to diagrams that don't have a config section.
+
+    Args:
+        mermaid_code: Raw Mermaid diagram code, potentially with YAML frontmatter.
+
+    Returns:
+        A tuple of (title, code_without_title) where title is None if not found.
+    """
     doc = frontmatter.loads(mermaid_code)
     title = None
-    if 'title' in doc.metadata:
-        title = doc.metadata['title']
-        del doc.metadata['title']
+    if "title" in doc.metadata:
+        title = doc.metadata["title"]
+        del doc.metadata["title"]
     # define a unified CoSAI mermaid style
-    if 'config' not in doc.metadata:
-        doc.metadata['config'] = {
-      'look': 'handDrawn',
-      'theme': 'base',
-      'themeVariables': {
-        'primaryColor': '#A8D9A4',
-        'primaryTextColor': '#3a5837ff',
-        'primaryBorderColor': '#60B358',
-        'lineColor': '#475467',
-        'secondaryColor': '#f2f4f7',
-        'tertiaryColor': '#ffffff',
-        'edgeLabelBackground':'#EBF6E8',
-        'clusterBkg' : '#E6EFFF', # <- subgraph color
-        'clusterBorder' : '#4D8BFF',
-        'titleColor' : '#0059ff',
-        'fontFamily': '"IBM Plex Sans", sans-serif',
-      }
-    }
+    if "config" not in doc.metadata:
+        doc.metadata["config"] = {
+            "look": "handDrawn",
+            "theme": "base",
+            "themeVariables": {
+                "primaryColor": "#A8D9A4",
+                "primaryTextColor": "#3a5837ff",
+                "primaryBorderColor": "#60B358",
+                "lineColor": "#475467",
+                "secondaryColor": "#f2f4f7",
+                "tertiaryColor": "#ffffff",
+                "edgeLabelBackground": "#EBF6E8",
+                "clusterBkg": "#E6EFFF",  # <- subgraph color
+                "clusterBorder": "#4D8BFF",
+                "titleColor": "#0059ff",
+                "fontFamily": '"IBM Plex Sans", sans-serif',
+            },
+        }
     return title, frontmatter.dumps(doc)
-    
-    # if match:
-    #     title = match.group(1)
-    #     # Remove the title line from the code
-    #     code_without_title = title_pattern.sub('', mermaid_code)
-    #     return title, code_without_title
-    # return None, mermaid_code
 
-def convert_mermaid_to_pdf(mermaid_code, index):
-    """
-    Converts a mermaid code block to a PDF file using mermaid-cli.
-    Returns tuple: (pdf_filename, title)
+
+def convert_mermaid_to_svg(
+    mermaid_code: str, index: int, temp_dir: str | None = None
+) -> tuple[str | None, str | None]:
+    """Convert a Mermaid code block to an SVG file using mermaid-cli.
+
+    SVG output provides better accessibility:
+    - Text remains selectable and searchable in final PDF
+    - No tagged PDF warnings
+    - Alt text carries through to PDF structure
+
+    Pandoc automatically converts SVG to PDF using rsvg-convert.
+
+    Args:
+        mermaid_code: Mermaid diagram code.
+        index: Index for unique filename generation.
+        temp_dir: Directory to create temp files in. If None, uses cwd.
+
+    Returns:
+        A tuple of (svg_filename, title) where both may be None on failure.
     """
     # Extract title before conversion
     title, code_without_title = extract_mermaid_title(mermaid_code)
-    
-    tmp_mmd = f"diagram_{index}.mmd"
-    tmp_pdf = f"diagram_{index}.pdf"
-    
+
+    # Create files in temp_dir if provided, otherwise use cwd (backward compat)
+    if temp_dir:
+        tmp_mmd = os.path.join(temp_dir, f"diagram_{index}.mmd")
+        tmp_svg = os.path.join(temp_dir, f"diagram_{index}.svg")
+    else:
+        tmp_mmd = f"diagram_{index}.mmd"
+        tmp_svg = f"diagram_{index}.svg"
+
     with open(tmp_mmd, "w") as f:
         f.write(code_without_title)
-    
+
     # Use npx to run mmdc (Mermaid CLI)
-    dep_prefix = 'latex-template' if os.path.exists('latex-template') else '.'
-    cmd = ["npx", 
-           "-y", 
-           "@mermaid-js/mermaid-cli", 
-           "-i", tmp_mmd, 
-           "-o", tmp_pdf, 
-           "-c", os.path.join(dep_prefix, "config.json"), 
-           "-p", os.path.join(dep_prefix, "puppeteerConfig.json")]
-    
-    print(f"Generating diagram {index}...")
+    cmd = [
+        "npx",
+        "-y",
+        "@mermaid-js/mermaid-cli",
+        "-i",
+        tmp_mmd,
+        "-o",
+        tmp_svg,
+        "-c",
+        get_asset_path("config.json"),
+        "-p",
+        get_asset_path("puppeteerConfig.json"),
+    ]
+
     try:
-        print(f'Command: {cmd}')
-        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["pdfcrop", "--margins", "5", tmp_pdf, tmp_pdf], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(cmd, check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
-        print(f"Error converting mermaid diagram {index}:")
-        print(e.stderr.decode())
+        print(f"❌ Failed to render diagram {index}", file=sys.stderr)
+        if e.stderr:
+            print(e.stderr.decode(), file=sys.stderr)
         return None, None
     finally:
         if os.path.exists(tmp_mmd):
             os.remove(tmp_mmd)
-            
-    return tmp_pdf, title
 
-def download_image(url, index):
-    """
-    Downloads an image from a URL to a local temporary file.
-    Converts GitHub blob URLs to raw URLs.
+    # Return just filename since pandoc runs from temp_dir
+    if temp_dir:
+        return os.path.basename(tmp_svg), title
+    return tmp_svg, title
+
+
+def download_image(url: str, index: int, temp_dir: str | None = None) -> str | None:
+    """Download an image from a URL to a local temporary file.
+
+    Convert GitHub blob URLs to raw URLs for direct access.
+
+    Args:
+        url: URL to download the image from.
+        index: Index for unique filename generation.
+        temp_dir: Directory to download files to. If None, uses cwd.
+
+    Returns:
+        Path to downloaded file, or None on error.
     """
     # Convert GitHub blob URLs to raw URLs
     if "github.com" in url and "/blob/" in url:
         url = url.replace("/blob/", "/raw/")
-    
+
     try:
         # Determine extension from URL or default to .png
         ext = os.path.splitext(url)[1]
-        if not ext or len(ext) > 5: # Basic check for valid extension
-             ext = ".png"
-        
-        tmp_img = f"downloaded_image_{index}{ext}"
-        
-        print(f"Downloading image {index} from {url}...")
+        if not ext or len(ext) > 5:  # Basic check for valid extension
+            ext = ".png"
+
+        # Create file in temp_dir if provided, otherwise use cwd (backward compat)
+        if temp_dir:
+            tmp_img = os.path.join(temp_dir, f"downloaded_image_{index}{ext}")
+        else:
+            tmp_img = f"downloaded_image_{index}{ext}"
+
         if not os.path.exists(tmp_img):
             urllib.request.urlretrieve(url, tmp_img)
+        # Return just filename since pandoc runs from temp_dir
+        if temp_dir:
+            return os.path.basename(tmp_img)
         return tmp_img
-    except Exception as e:
-        print(f"Error downloading image from {url}: {e}")
+    except Exception:
+        print(f"❌ Failed to download image: {url}", file=sys.stderr)
         return None
 
-def strip_trailing_whitespace(text: str) -> str:
-    """
-    Return a copy of *text* with all trailing whitespace removed from every line.
-    
-    The function keeps the original line‑ending characters untouched, so the
-    resulting string has the same number of lines as the input.
-    
-    Parameters
-    ----------
-    text : str
-        The multiline string to process.
 
-    Returns
-    -------
-    str
+def strip_trailing_whitespace(text: str) -> str:
+    """Return a copy of text with trailing whitespace removed from every line.
+
+    The function preserves the line count of the input string.
+
+    Args:
+        text: The multiline string to process.
+
+    Returns:
         A new string with trailing whitespace removed from each line.
     """
     # Split the text into lines **including** the line‑endings.
@@ -139,85 +317,113 @@ def strip_trailing_whitespace(text: str) -> str:
     processed_lines = []
     for line in lines:
         processed_lines.append(line.rstrip())
-    return '\n'.join(processed_lines)
+    return "\n".join(processed_lines)
 
-def process_markdown(input_file):
-    """
-    Reads markdown file, finds mermaid blocks, converts them, and replaces 
-    blocks with image links. Also downloads remote images.
+
+def process_markdown(
+    input_file: str, engine: str | None = None, temp_dir: str | None = None
+) -> str:
+    """Read a Markdown file and preprocess it for LaTeX conversion.
+
+    Performs these transformations:
+    1. Strip trailing whitespace
+    2. Normalize Unicode characters (for pdflatex)
+    3. Remove manual Table of Contents sections
+    4. Convert HTML anchor tags to Pandoc format
+    5. Convert Mermaid diagrams to SVG images
+    6. Download remote images to local files
+    7. Convert HTML break tags to LaTeX newlines
+
+    Args:
+        input_file: Path to the input Markdown file.
+        engine: LaTeX engine name for Unicode normalization. Should be one of
+            VALID_LATEX_ENGINES (tectonic, pdflatex, xelatex, lualatex).
+            Pass None to preserve all Unicode characters.
+        temp_dir: Directory to create temp files in. If None, uses cwd.
+
+    Returns:
+        Processed Markdown content ready for Pandoc conversion.
     """
     with open(input_file, "r") as f:
         content = f.read()
 
     content = strip_trailing_whitespace(content)
 
-    # 0.5. Remove "Table of Contents" section
+    # Normalize Unicode characters for LaTeX engine compatibility
+    content = normalize_unicode_for_latex(content, engine)
+
+    # 1. Remove "Table of Contents" section
     # Regex to match "# Table of contents" (case insensitive) and the following list
     # Matches until the next header or end of string
-    toc_pattern = re.compile(r"^#\s*Table of [Cc]ontents.*?(?=^#|\Z)", re.MULTILINE | re.DOTALL)
+    toc_pattern = re.compile(
+        r"^#\s*Table of [Cc]ontents.*?(?=^#|\Z)", re.MULTILINE | re.DOTALL
+    )
     content = toc_pattern.sub("", content)
 
-    # 0.5. Convert HTML anchor tags to Markdown anchors
+    # 2. Convert HTML anchor tags to Markdown anchors
     # Replace <a id="anchor-name"></a> with []{#anchor-name}
     anchor_pattern = re.compile(r'<a id="([^"]+)"></a>')
-    content = anchor_pattern.sub(r'[]{#\1}', content)
+    content = anchor_pattern.sub(r"[]{#\1}", content)
 
-    # 1. Handle Mermaid blocks
+    # 3. Handle Mermaid blocks
     # Regex to find mermaid code blocks: ```mermaid ... ```
     mermaid_pattern = re.compile(r"```mermaid\n(.*?)```", re.DOTALL)
-    
+
     diagram_count = 0
 
     def mermaid_replacer(match):
         nonlocal diagram_count
         mermaid_code = match.group(1)
-        pdf_filename, title = convert_mermaid_to_pdf(mermaid_code, diagram_count)
-        
-        if pdf_filename:
+        svg_filename, title = convert_mermaid_to_svg(
+            mermaid_code, diagram_count, temp_dir=temp_dir
+        )
+
+        if svg_filename:
             diagram_count += 1
             # Use extracted title as caption, or default to empty
             caption = title if title else ""
-            return f"![{caption}]({pdf_filename})"
+            return f"![{caption}]({svg_filename})"
         else:
             return match.group(0)  # distinct failure, keep original
 
     content = mermaid_pattern.sub(mermaid_replacer, content)
 
-    # 2. Handle Remote Images
+    # 4. Handle Remote Images
     # Regex to find image links: ![alt](url)
     # We are looking for http/https urls
-    image_pattern = re.compile(r'!\[(.*?)\]\((http[s]?://.*?)\)')
-    
+    image_pattern = re.compile(r"!\[(.*?)\]\((http[s]?://.*?)\)")
+
     image_count = 0
+
     def image_replacer(match):
         nonlocal image_count
         alt_text = match.group(1)
         url = match.group(2)
-        
-        local_filename = download_image(url, image_count)
-        
+
+        local_filename = download_image(url, image_count, temp_dir=temp_dir)
+
         if local_filename:
             image_count += 1
             return f"![{alt_text}]({local_filename})"
         else:
-            return match.group(0) # distinct failure, keep original
+            return match.group(0)  # distinct failure, keep original
 
     content = image_pattern.sub(image_replacer, content)
-    
-    # 3. Replace HTML <br /> tags with LaTeX line breaks
-    # In tables, use \newline; elsewhere use double backslash
-    # Pushing until after Mermaid and image processing
-    if True:
-        content = content.replace('<br />', ' \\newline ')
-        content = content.replace('<br/>', ' \\newline ')
-        content = content.replace('<br>', ' \\newline ')
-        content = content.replace('</br>', ' \\newline ')
-        pass
+
+    # 5. Replace HTML <br /> tags with LaTeX line breaks
+    content = content.replace("<br />", " \\newline ")
+    content = content.replace("<br/>", " \\newline ")
+    content = content.replace("<br>", " \\newline ")
+    content = content.replace("</br>", " \\newline ")
 
     return content
 
-def main():
-    parser = argparse.ArgumentParser(description="Convert Markdown to PDF with Mermaid support.")
+
+def main() -> None:
+    """Parse arguments and execute the Markdown to PDF conversion pipeline."""
+    parser = argparse.ArgumentParser(
+        description="Convert Markdown to PDF with Mermaid support."
+    )
     parser.add_argument("input_file", help="Path to input Markdown file")
     parser.add_argument("output_file", help="Path to output PDF file")
     # Override the Markdown header
@@ -225,59 +431,87 @@ def main():
     parser.add_argument("--author", help="Document author(s)", default="")
     parser.add_argument("--date", help="Document date", default="")
     parser.add_argument("--version", help="Version of the paper", default="1.0")
-    
+    parser.add_argument(
+        "--engine",
+        choices=VALID_LATEX_ENGINES,
+        help=f"LaTeX engine to use (default: {DEFAULT_LATEX_ENGINE})",
+    )
+
     args = parser.parse_args()
-    
+
     if not os.path.exists(args.input_file):
-        print(f"Error: Input file '{args.input_file}' not found.")
+        print(f"❌ Input file not found: {args.input_file}", file=sys.stderr)
         sys.exit(1)
 
-    # create a temporary file for the processed markdown
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as tmp_md:
-        processed_content = process_markdown(args.input_file)
-        tmp_md.write(processed_content)
-        tmp_md_path = tmp_md.name
+    print(f"Converting {args.input_file}...")
 
-    print("Markdown processed. Running Pandoc...")
+    # Determine which LaTeX engine to use (before processing markdown)
+    dep_prefix = "latex-template" if os.path.exists("latex-template") else "."
+    config_path = os.path.join(dep_prefix, CONFIG_FILE_NAME)
+    engine = get_latex_engine(cli_engine=args.engine, config_path=config_path)
 
-    dep_prefix = 'latex-template' if os.path.exists('latex-template') else '.'
-    cmd = [
-        "pandoc",
-        tmp_md_path,
-        # "-s",
-        "-o", args.output_file,# + ".tex",
-        f"--template={os.path.join(dep_prefix, 'cosai-template.tex')}",
-        "--pdf-engine=pdflatex",
-        "--syntax-highlighting=idiomatic"
-    ]
-    
-    # Add metadata variables if provided
-    if args.title:
-        cmd.extend(["-V", f"title={args.title}"])
-    if args.author:
-        cmd.extend(["-V", f"author={args.author}"])
-    if args.date:
-        cmd.extend(["-V", f"date={args.date}"])
-    
-    cmd.extend(["-V", f"git={args.version}"])
-    print(f'Running command: {' '.join(cmd)}')
-    try:
-        subprocess.run(cmd, check=True)
-        print(f"Successfully created {args.output_file}")
-    except subprocess.CalledProcessError as e:
-        # Need a better error message here
-        print("Error running pandoc:")
-        print("Make sure you have a latex engine installed (e.g. pdflatex).")
-    except FileNotFoundError:
-        print("Error: pandoc not found.")
-        print("Make sure pandoc is installed and in your PATH.")
-    finally:
-        # Cleanup temp markdown
-        if os.path.exists(tmp_md_path):
-            os.remove(tmp_md_path)
-            
-    # Optional logic to cleanup generated PDFs/Images could go here
-    # but based on previous behaviour we leave them for now.
+    # Use temporary directory for all conversion artifacts
+    with tempfile.TemporaryDirectory(prefix="cosai_convert_") as temp_dir:
+        # Process markdown with temp directory for diagrams and images
+        processed_content = process_markdown(args.input_file, engine, temp_dir=temp_dir)
+
+        # Create temporary file for processed markdown in temp directory
+        tmp_md_path = os.path.join(temp_dir, "processed.md")
+        with open(tmp_md_path, "w") as tmp_md:
+            tmp_md.write(processed_content)
+
+        # Copy LaTeX assets to temp directory so tectonic can find them
+        # Tectonic looks in cwd for files, so we run pandoc from temp_dir
+        latex_assets = [
+            "cosai.sty",
+            "cosai-logo.png",
+            "background.pdf",
+            "CoSAI(Light).pdf",
+        ]
+        for asset in latex_assets:
+            src = get_asset_path(asset)
+            if os.path.exists(src):
+                shutil.copy(src, temp_dir)
+
+        # Use absolute path for output file since we're changing cwd
+        output_path = os.path.abspath(args.output_file)
+        cmd = [
+            "pandoc",
+            "--quiet",
+            "processed.md",  # relative path since we run from temp_dir
+            "-o",
+            output_path,
+            f"--template={get_asset_path('cosai-template.tex')}",
+            f"--pdf-engine={engine}",
+            "--syntax-highlighting=idiomatic",
+        ]
+
+        # Add metadata variables if provided
+        if args.title:
+            cmd.extend(["-V", f"title={args.title}"])
+        if args.author:
+            cmd.extend(["-V", f"author={args.author}"])
+        if args.date:
+            cmd.extend(["-V", f"date={args.date}"])
+
+        cmd.extend(["-V", f"git={args.version}"])
+
+        try:
+            # Run pandoc from temp_dir so tectonic finds assets in cwd
+            # Capture output to suppress tectonic warnings; show only on error
+            result = subprocess.run(cmd, cwd=temp_dir, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"❌ Conversion failed ({engine})", file=sys.stderr)
+                if result.stderr:
+                    print(result.stderr, file=sys.stderr)
+                sys.exit(1)
+            print(f"✅ {output_path}")
+        except FileNotFoundError:
+            print("❌ pandoc not found", file=sys.stderr)
+            sys.exit(1)
+
+    # Temp directory and all contents auto-cleaned by context manager
+
 
 if __name__ == "__main__":
     main()

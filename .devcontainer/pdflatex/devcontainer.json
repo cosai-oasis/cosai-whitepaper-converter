@@ -1,0 +1,42 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/python
+{
+	"name": "Python-314",
+	"dockerFile": "Dockerfile",
+	"build": {
+		"args": {
+			"WORKSPACE": "/workspace",
+			"WORKSPACE_REPO": "secure-ai-tooling"
+		}
+	},
+
+	"features": {
+		"ghcr.io/devcontainers/features/python:1": {
+	      "version": "3.14"
+	    },
+		"ghcr.io/devcontainers/features/node:1": {},
+		"ghcr.io/rocker-org/devcontainer-features/pandoc:1": {
+			"version": "latest"
+		}
+	},
+	
+	"onCreateCommand": {
+		"pip-install": "pip install -r requirements.txt",
+		"npm-install": "npm install",
+		"configure-chromium": "./scripts/configure-chromium.sh --auto"
+	},
+
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"charliermarsh.ruff"
+			],
+			"settings": {
+				"python.defaultInterpreterPath": "/usr/local/python/current/bin/python"
+			}
+		}
+	},
+
+	"remoteUser": "vscode"
+}

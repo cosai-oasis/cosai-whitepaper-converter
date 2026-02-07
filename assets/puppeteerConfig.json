@@ -1,0 +1,5 @@
+{
+    "defaultViewport": null,
+    "executablePath": "/ms-playwright/chromium_headless_shell-1194/chrome-linux/headless_shell",
+    "args": ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+}

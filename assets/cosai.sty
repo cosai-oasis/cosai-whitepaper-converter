@@ -1,17 +1,50 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesPackage{cosai}[2024/05/20 CoSAI White Paper Template]
 
-\RequirePackage[utf8]{inputenc}
-\RequirePackage[T1]{fontenc}
+% Engine detection for proper font handling
+\RequirePackage{iftex}
+
+\ifPDFTeX
+  % pdflatex: Use traditional 8-bit encoding
+  \RequirePackage[utf8]{inputenc}
+  \RequirePackage[T1]{fontenc}
+  \usepackage[defaultfam,tabular,lining]{montserrat}
+\else
+  % XeTeX/LuaTeX/Tectonic: Use fontspec for full Unicode
+  \RequirePackage{fontspec}
+  \setmainfont{Montserrat}[
+    Extension = .otf,
+    UprightFont = *-Regular,
+    BoldFont = *-Medium,
+    ItalicFont = *-Italic,
+    BoldItalicFont = *-BoldItalic,
+    FontFace = {el}{n}{*-ExtraLight},
+    FontFace = {l}{n}{*-Light},
+    FontFace = {mb}{n}{*-Medium},
+    FontFace = {sb}{n}{*-SemiBold},
+  ]
+  \setsansfont{Montserrat}[
+    Extension = .otf,
+    UprightFont = *-Regular,
+    BoldFont = *-Medium,
+    ItalicFont = *-Italic,
+    BoldItalicFont = *-MediumItalic,
+    FontFace = {el}{n}{*-ExtraLight},
+    FontFace = {l}{n}{*-Light},
+    FontFace = {mb}{n}{*-Medium},
+    FontFace = {sb}{n}{*-SemiBold},
+  ]
+\fi
+
 \RequirePackage{xcolor}
 \RequirePackage{graphicx}
+\graphicspath{{assets/}}
 \RequirePackage{geometry}
 \RequirePackage{fancyhdr}
 \RequirePackage{titlesec}
 \RequirePackage{tikz}
 \RequirePackage{hyperref}
 \RequirePackage{tcolorbox}
-\usepackage[defaultfam,tabular,lining]{montserrat} %% Option 'defaultfam'
 
 
 
@@ -22,7 +55,8 @@
 % Font Weight Options (use with \fontseries{XX}\selectfont):
 %   el = ExtraLight (lightest)
 %   l  = Light
-%   m  = Regular/Medium (normal weight)
+%   m  = Regular (normal weight)
+%   mb = Medium
 %   sb = SemiBold
 %   b  = Bold (heaviest)
 %
@@ -39,7 +73,7 @@
 
 % --- Bold Text Redefinition ---
 % What weight to use when \textbf{} or **bold** is used in markdown
-\newcommand{\boldFontWeight}{m}   % Regular (instead of actual bold)
+\newcommand{\boldFontWeight}{mb}   % Medium (instead of actual bold)
 
 % --- Cover Page Title ---
 \newcommand{\coverTitleSize}{30}        % Font size in points
@@ -223,3 +257,8 @@
   {}
   {0pt}
   {}
+
+% --- Suppress cosmetic LaTeX warnings ---
+% Underfull hbox warnings are common with short headings and the CoSAI underline style
+\hbadness=10000  % Suppress underfull hbox warnings
+\vbadness=10000  % Suppress underfull vbox warnings

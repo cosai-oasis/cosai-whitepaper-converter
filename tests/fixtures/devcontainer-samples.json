@@ -1,0 +1,111 @@
+{
+  "minimal": {
+    "name": "Minimal CoSAI Whitepaper Converter",
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+      "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {}
+    }
+  },
+  "with_tectonic": {
+    "name": "CoSAI Whitepaper Converter with Tectonic",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {
+        "latexEngine": "tectonic"
+      }
+    }
+  },
+  "with_pdflatex": {
+    "name": "CoSAI Whitepaper Converter with pdflatex",
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+      "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {
+        "latexEngine": "pdflatex"
+      }
+    }
+  },
+  "with_xelatex": {
+    "name": "CoSAI Whitepaper Converter with XeLaTeX",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {
+        "latexEngine": "xelatex"
+      }
+    }
+  },
+  "with_lualatex": {
+    "name": "CoSAI Whitepaper Converter with LuaLaTeX",
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+      "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {
+        "latexEngine": "lualatex"
+      }
+    }
+  },
+  "skip_chromium": {
+    "name": "CoSAI Whitepaper Converter without Chromium",
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+      "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {
+        "latexEngine": "tectonic",
+        "skipChromium": true
+      }
+    }
+  },
+  "skip_python": {
+    "name": "CoSAI Whitepaper Converter without Python install",
+    "image": "mcr.microsoft.com/devcontainers/python:3.12",
+    "features": {
+      "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {
+        "latexEngine": "tectonic",
+        "skipPython": true
+      }
+    }
+  },
+  "skip_node": {
+    "name": "CoSAI Whitepaper Converter without Node install",
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:18",
+    "features": {
+      "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {
+        "latexEngine": "tectonic",
+        "skipNode": true
+      }
+    }
+  },
+  "all_skips": {
+    "name": "CoSAI Whitepaper Converter minimal (all skips)",
+    "image": "mcr.microsoft.com/devcontainers/python:3.12",
+    "features": {
+      "ghcr.io/devcontainers/features/node:1": {},
+      "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {
+        "latexEngine": "tectonic",
+        "skipChromium": true,
+        "skipPython": true,
+        "skipNode": true
+      }
+    }
+  },
+  "full_featured": {
+    "name": "CoSAI Whitepaper Converter with all options",
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+      "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {
+        "latexEngine": "pdflatex",
+        "skipChromium": false,
+        "skipPython": false,
+        "skipNode": false
+      }
+    }
+  },
+  "with_other_features": {
+    "name": "CoSAI Whitepaper Converter with common features",
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+      "ghcr.io/devcontainers/features/git:1": {},
+      "ghcr.io/devcontainers/features/github-cli:1": {},
+      "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {
+        "latexEngine": "tectonic"
+      }
+    }
+  }
+}

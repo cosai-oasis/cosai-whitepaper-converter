@@ -1,4 +1,8 @@
 $passoptions.latex()$
+% Set PDF version to 1.7 to match Mermaid-generated diagrams
+% Note: Tectonic may still show a warning due to a known bug, but output is correct
+\RequirePackage{pdfmanagement-testphase}
+\DeclareDocumentMetadata{pdfversion=1.7}
 \documentclass[
 $for(babel-otherlangs)$
   $babel-otherlangs$,
@@ -81,8 +85,10 @@ $endif$
 $if(has-frontmatter)$
 \frontmatter
 $endif$
+\pagenumbering{gobble}  % Suppress page number on cover page
 \makeCoSAICover{$title$}{$author$}{$date$}{$git$$if(thanks)$\thanks{$thanks$}$endif$}
 \newpage
+\pagenumbering{arabic}  % Restart page numbering from 1
 \tableofcontents
 \newpage
 
