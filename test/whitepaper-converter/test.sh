@@ -55,6 +55,29 @@ check "package.json installed" test -f /usr/local/lib/cosai-converter/package.js
 check "cosai-convert wrapper exists" command -v cosai-convert
 check "cosai-convert is executable" test -x /usr/local/bin/cosai-convert
 check "wrapper points to default path" bash -c "grep '/usr/local/lib/cosai-converter' /usr/local/bin/cosai-convert"
+check "wrapper sets PYTHONPATH" bash -c "grep 'PYTHONPATH' /usr/local/bin/cosai-convert"
+check "frontmatter in bundled lib" python3 -c "import sys; sys.path.insert(0, '/usr/local/lib/cosai-converter/lib'); import frontmatter"
+check "wrapper imports frontmatter without error" bash -c "cosai-convert 2>&1 | head -5 | grep -qv ModuleNotFoundError"
 check "COSAI_CONVERTER_PATH set" bash -c ". /etc/profile.d/cosai-converter.sh && test -n \"\${COSAI_CONVERTER_PATH}\""
+
+# End-to-end conversion test: mermaid diagram → PDF
+# This catches ARM64 chromium issues and rendering pipeline failures
+TICK='```'
+cat > /tmp/test-mermaid.md << TESTEOF
+---
+title: "Test"
+author: "CI"
+date: "2025-01-01"
+---
+# Test
+
+${TICK}mermaid
+graph TD
+    A[Start] --> B[End]
+${TICK}
+TESTEOF
+
+check "mermaid conversion succeeds" cosai-convert /tmp/test-mermaid.md /tmp/test-output.pdf
+check "output PDF exists and is non-empty" test -s /tmp/test-output.pdf
 
 reportResults

@@ -47,25 +47,15 @@ get_project_root() {
     fi
 }
 
-# Find Playwright's Chromium installation
-find_playwright_chromium() {
-    echo "📦 Checking for Playwright Chromium..."
-    if ! npx --version </dev/null &>/dev/null; then
-        echo "❌ npx not found. Please install Node.js first."
-        exit 1
-    fi
+# Global install location for Playwright browsers (used when installing as root)
+_PLAYWRIGHT_GLOBAL_PATH="/usr/local/share/playwright"
 
-    if ! npx playwright -V </dev/null &>/dev/null && [[ "$INSTALL_PLAYWRIGHT" == "true" ]]; then
-        echo "   Playwright Chromium not found. Installing..."
-        if ! npx playwright install chromium --with-deps </dev/null; then
-            echo "❌ Failed to install Playwright Chromium"
-            echo "   Exiting..."
-            exit 1
-        fi
-        echo "✅ Playwright Chromium installed ..."
-    fi
-
-    # Check if playwright chromium is already installed
+# Search known Playwright browser paths for a chromium binary.
+# Checks /ms-playwright (devcontainer), global install path,
+# $PLAYWRIGHT_BROWSERS_PATH, and $HOME/.cache/ms-playwright.
+# Prefers headless_shell over chrome.
+# Returns path via stdout (use in command substitution).
+_search_playwright_binary() {
     local BROWSER_PATHS="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
 
     # Also check the global path used by devcontainer
@@ -73,8 +63,14 @@ find_playwright_chromium() {
         BROWSER_PATHS="/ms-playwright:$BROWSER_PATHS"
     fi
 
+    # Also check the system-wide install location (used when installed as root)
+    if [[ -d "$_PLAYWRIGHT_GLOBAL_PATH" ]]; then
+        BROWSER_PATHS="$_PLAYWRIGHT_GLOBAL_PATH:$BROWSER_PATHS"
+    fi
+
     local CHROME_EXEC=""
     for browser_path in ${BROWSER_PATHS//:/ }; do
+        [[ ! -d "$browser_path" ]] && continue
         if [[ -z "$CHROME_EXEC" ]]; then
             CHROME_EXEC=$(find "$browser_path" -name "headless_shell" -type f 2>/dev/null | head -1)
         fi
@@ -83,11 +79,45 @@ find_playwright_chromium() {
         fi
     done
 
-    local playwright_path=$CHROME_EXEC
+    echo "$CHROME_EXEC"
+}
+
+# Find Playwright's Chromium installation
+find_playwright_chromium() {
+    echo "📦 Checking for Playwright Chromium..."
+    if ! npx --version </dev/null &>/dev/null; then
+        echo "❌ npx not found. Please install Node.js first."
+        exit 1
+    fi
+
+    # Search for existing chromium binary first
+    local playwright_path
+    playwright_path=$(_search_playwright_binary)
+
+    # If binary not found and we're allowed to install, do so
+    if [[ -z "$playwright_path" || ! -x "$playwright_path" ]] && [[ "$INSTALL_PLAYWRIGHT" == "true" ]]; then
+        # When running as root (e.g., during Docker build), install to a globally
+        # accessible location so non-root users can access the browser at runtime.
+        # Without this, Playwright installs to /root/.cache/ms-playwright/ which
+        # is inaccessible to non-root users due to /root/ having mode 700.
+        if [[ "${EUID:-$(id -u)}" == "0" ]]; then
+            export PLAYWRIGHT_BROWSERS_PATH="$_PLAYWRIGHT_GLOBAL_PATH"
+            echo "   Installing to global path: $PLAYWRIGHT_BROWSERS_PATH"
+        fi
+        echo "   Playwright Chromium binary not found. Installing..."
+        if ! npx playwright install chromium --with-deps </dev/null; then
+            echo "❌ Failed to install Playwright Chromium"
+            echo "   Exiting..."
+            exit 1
+        fi
+        echo "✅ Playwright Chromium installed"
+        # Search again after installation
+        playwright_path=$(_search_playwright_binary)
+    fi
 
     if [[ -n "$playwright_path" && -x "$playwright_path" ]]; then
         CHROMIUM_PATH="$playwright_path"
-        echo "✅ Found existing Playwright Chromium at: $playwright_path"
+        echo "✅ Found Playwright Chromium at: $playwright_path"
     else
         echo "   Playwright Chromium not found."
         echo "   Please install Playwright manually or run:"

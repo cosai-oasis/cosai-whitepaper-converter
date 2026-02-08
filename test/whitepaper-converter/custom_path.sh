@@ -22,6 +22,9 @@ check "package.json at custom path" test -f /opt/cosai/package.json
 check "cosai-convert wrapper exists" command -v cosai-convert
 check "cosai-convert is executable" test -x /usr/local/bin/cosai-convert
 check "wrapper points to custom path" bash -c "grep '/opt/cosai' /usr/local/bin/cosai-convert"
+check "wrapper sets PYTHONPATH" bash -c "grep 'PYTHONPATH' /usr/local/bin/cosai-convert"
+check "frontmatter in bundled lib" python3 -c "import sys; sys.path.insert(0, '/opt/cosai/lib'); import frontmatter"
+check "wrapper imports frontmatter without error" bash -c "cosai-convert 2>&1 | head -5 | grep -qv ModuleNotFoundError"
 
 # Verify COSAI_CONVERTER_PATH points to custom path
 check "COSAI_CONVERTER_PATH points to custom path" bash -c ". /etc/profile.d/cosai-converter.sh && test \"\${COSAI_CONVERTER_PATH}\" = '/opt/cosai'"

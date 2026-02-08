@@ -130,6 +130,14 @@ if [ -n "${CONVERTER_DIR}" ]; then
         done
     fi
 
+    # Overwrite bundled puppeteerConfig.json with the freshly generated one.
+    # configure-chromium.sh (called by install-deps.sh) writes a platform-correct
+    # config to SCRIPT_DIR/assets/. The bundled copy may have a stale hardcoded
+    # executablePath from the build environment.
+    if [ -f "${SCRIPT_DIR}/assets/puppeteerConfig.json" ]; then
+        cp "${SCRIPT_DIR}/assets/puppeteerConfig.json" "${INSTALL_PATH}/assets/"
+    fi
+
     # Copy dependency files if available
     for f in requirements.txt package.json; do
         if [ -f "${CONVERTER_DIR}/${f}" ]; then
@@ -137,9 +145,39 @@ if [ -n "${CONVERTER_DIR}" ]; then
         fi
     done
 
+    # Install Python dependencies into bundled lib directory.
+    # This ensures frontmatter is importable even when a different Python
+    # (e.g. mise-managed) is on the user's PATH at runtime.
+    if [ -f "${INSTALL_PATH}/requirements.txt" ]; then
+        python_exe=""
+        if command -v python3 >/dev/null 2>&1; then
+            python_exe="python3"
+        elif command -v python3.12 >/dev/null 2>&1; then
+            python_exe="python3.12"
+        fi
+
+        if [ -n "$python_exe" ]; then
+            mkdir -p "${INSTALL_PATH}/lib"
+            if ! $python_exe -m pip install --target "${INSTALL_PATH}/lib" \
+                    -r "${INSTALL_PATH}/requirements.txt" 2>/dev/null; then
+                if ! $python_exe -m pip install --target "${INSTALL_PATH}/lib" \
+                        --break-system-packages \
+                        -r "${INSTALL_PATH}/requirements.txt" 2>&1; then
+                    echo "Warning: Failed to bundle Python dependencies to ${INSTALL_PATH}/lib" >&2
+                fi
+            fi
+        else
+            echo "Warning: python3 not found, cannot bundle Python dependencies" >&2
+            echo "  frontmatter must be installed system-wide for converter to work" >&2
+        fi
+    fi
+
     # Create wrapper script
+    # PYTHONPATH ensures bundled dependencies (frontmatter) are found
+    # regardless of which Python interpreter is active at runtime
     cat > /usr/local/bin/cosai-convert << WRAPPER_EOF
 #!/usr/bin/env bash
+export PYTHONPATH="${INSTALL_PATH}/lib\${PYTHONPATH:+:\$PYTHONPATH}"
 exec python3 "${INSTALL_PATH}/convert.py" "\$@"
 WRAPPER_EOF
     chmod +x /usr/local/bin/cosai-convert
