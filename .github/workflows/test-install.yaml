@@ -10,7 +10,18 @@ on:
     paths:
       - 'scripts/**'
       - '.github/workflows/test-install.yaml'
+  workflow_dispatch:
+    inputs:
+      run_macos:
+        description: 'Run macOS install tests'
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      run_macos:
+        description: 'Run macOS install tests'
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -95,7 +106,13 @@ jobs:
             /tmp/test.pdf
           if-no-files-found: ignore
 
+  # macOS tests are expensive (~30 min each) and rarely needed.
+  # Disabled by default. Enable via:
+  #   - PR label: add 'test-macos' to the pull request
+  #   - Manual run: Actions → "Run workflow" → check "Run macOS install tests"
+  #   - Caller workflow: pass run_macos: true via workflow_call
   test-install-macos:
+    if: inputs.run_macos || contains(github.event.pull_request.labels.*.name, 'test-macos')
     runs-on: macos-latest
     needs: test-verify
     timeout-minutes: 30
@@ -109,6 +126,7 @@ jobs:
         run: bash ./scripts/verify-deps.sh
 
   test-install-macos-arm64:
+    if: inputs.run_macos || contains(github.event.pull_request.labels.*.name, 'test-macos')
     runs-on: macos-14
     needs: test-verify
     timeout-minutes: 30

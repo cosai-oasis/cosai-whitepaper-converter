@@ -889,15 +889,17 @@ class TestExitCodes:
         Test that script exits with 3 when sudo is needed but not available.
 
         Given: Linux system (requires sudo) without sudo command
+               Non-root user (_TEST_EUID=1000, since EUID is readonly in bash)
         When: install-deps.sh is executed
         Then: Exit code is 3
-              Output indicates sudo is required
         """
         # Create apt-get but not sudo
         create_mock_package_manager(mock_bin_dir, "apt-get", success=True)
         # Don't create sudo
 
         mock_env["PATH"] = str(mock_bin_dir)
+        # Force non-root context (EUID is readonly in bash, so use _TEST_EUID)
+        mock_env["_TEST_EUID"] = "1000"
         result = run_install_deps(env=mock_env)
 
         # Should fail with exit code 3 (strict assertion)

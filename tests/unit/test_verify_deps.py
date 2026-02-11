@@ -216,7 +216,7 @@ class TestMissingDependencies:
         # Create all dependencies except LaTeX engine
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
 
         mock_env["PATH"] = str(mock_bin_dir)
         result = run_verify_deps(env=mock_env)
@@ -256,7 +256,7 @@ class TestVersionValidation:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.12.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Mock configure-chromium.sh check
@@ -283,7 +283,7 @@ class TestVersionValidation:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         mock_env["PATH"] = str(mock_bin_dir)
@@ -343,7 +343,7 @@ class TestVersionValidation:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v18.0.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         mock_env["PATH"] = str(mock_bin_dir)
@@ -362,7 +362,7 @@ class TestVersionValidation:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         mock_env["PATH"] = str(mock_bin_dir)
@@ -394,14 +394,71 @@ class TestVersionValidation:
             or "requires 18+" in result.stdout
         )
 
-    def test_pandoc_version_30_passes(self, mock_env, mock_bin_dir):
+    def test_pandoc_version_3821_passes(self, mock_env, mock_bin_dir):
         """
-        Test that Pandoc 3.0.x passes version validation.
+        Test that Pandoc 3.8.2.1 passes version validation.
 
-        Given: Pandoc 3.0.0 installed
+        Given: Pandoc 3.8.2.1 installed (minimum required version)
         When: verify-deps.sh is executed
         Then: Pandoc check shows [✓]
-              Output shows "requires 3.0+"
+        """
+        create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
+        create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
+        create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
+
+        mock_env["PATH"] = str(mock_bin_dir)
+        result = run_verify_deps(env=mock_env)
+
+        assert "[✓]" in result.stdout
+        assert "Pandoc 3.8.2.1" in result.stdout
+        assert "requires 3.8.2.1+" in result.stdout
+
+    def test_pandoc_version_382_three_parts_fails(self, mock_env, mock_bin_dir):
+        """
+        Test that Pandoc 3.8.2 (3-part) fails against 3.8.2.1 minimum.
+
+        Given: Pandoc 3.8.2 installed (3-part, treated as 3.8.2.0)
+        When: verify-deps.sh is executed
+        Then: Pandoc check shows [✗] version too low
+        """
+        create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
+        create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2", 0)
+        create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
+
+        mock_env["PATH"] = str(mock_bin_dir)
+        result = run_verify_deps(env=mock_env)
+
+        assert "[✗]" in result.stdout
+        assert "version too low" in result.stdout.lower()
+
+    def test_pandoc_version_383_passes(self, mock_env, mock_bin_dir):
+        """
+        Test that Pandoc 3.8.3 passes (patch > 3.8.2.x).
+
+        Given: Pandoc 3.8.3 installed (higher patch than 3.8.2.1)
+        When: verify-deps.sh is executed
+        Then: Pandoc check shows [✓]
+        """
+        create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
+        create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.3", 0)
+        create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
+
+        mock_env["PATH"] = str(mock_bin_dir)
+        result = run_verify_deps(env=mock_env)
+
+        assert "[✓]" in result.stdout
+        assert "Pandoc 3.8.3" in result.stdout
+
+    def test_pandoc_version_30_fails(self, mock_env, mock_bin_dir):
+        """
+        Test that Pandoc 3.0.0 fails version validation.
+
+        Given: Pandoc 3.0.0 installed (below 3.8.2.1 minimum)
+        When: verify-deps.sh is executed
+        Then: Pandoc check shows [✗] version too low
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
@@ -411,16 +468,17 @@ class TestVersionValidation:
         mock_env["PATH"] = str(mock_bin_dir)
         result = run_verify_deps(env=mock_env)
 
+        assert "[✗]" in result.stdout
         assert "Pandoc 3.0" in result.stdout
-        assert "requires 3.0+" in result.stdout
+        assert "version too low" in result.stdout.lower()
 
-    def test_pandoc_version_311_passes(self, mock_env, mock_bin_dir):
+    def test_pandoc_version_311_fails(self, mock_env, mock_bin_dir):
         """
-        Test that Pandoc 3.1.11 passes version validation.
+        Test that Pandoc 3.1.11 fails version validation.
 
-        Given: Pandoc 3.1.11 installed
+        Given: Pandoc 3.1.11 installed (below 3.8.2.1 minimum)
         When: verify-deps.sh is executed
-        Then: Pandoc check shows [✓]
+        Then: Pandoc check shows [✗] version too low
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
@@ -430,17 +488,18 @@ class TestVersionValidation:
         mock_env["PATH"] = str(mock_bin_dir)
         result = run_verify_deps(env=mock_env)
 
+        assert "[✗]" in result.stdout
         assert "Pandoc 3.1.11" in result.stdout
+        assert "version too low" in result.stdout.lower()
 
     def test_pandoc_version_2x_fails(self, mock_env, mock_bin_dir):
         """
         Test that Pandoc 2.x fails version validation.
 
-        Given: Pandoc 2.19.2 installed (below minimum 3.0)
+        Given: Pandoc 2.19.2 installed (below 3.8.2.1 minimum)
         When: verify-deps.sh is executed
         Then: Output shows [✗] for Pandoc
               Output indicates version too low
-              Exit code is 1
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
@@ -452,10 +511,7 @@ class TestVersionValidation:
         assert result.returncode == 1
         assert "[✗]" in result.stdout
         assert "2.19" in result.stdout
-        assert (
-            "version too low" in result.stdout.lower()
-            or "requires 3.0+" in result.stdout
-        )
+        assert "version too low" in result.stdout.lower()
 
 
 class TestOutputFormat:
@@ -472,7 +528,7 @@ class TestOutputFormat:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Mock python-frontmatter check
@@ -537,7 +593,7 @@ exit 0
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         mock_env["PATH"] = str(mock_bin_dir)
@@ -546,7 +602,7 @@ exit 0
         # Check for version numbers in output
         assert "3.14" in result.stdout, "Python version should appear"
         assert "20.10" in result.stdout, "Node.js version should appear"
-        assert "3.1.11" in result.stdout, "Pandoc version should appear"
+        assert "3.8.2.1" in result.stdout, "Pandoc version should appear"
         assert "0.15.0" in result.stdout, "Tectonic version should appear"
 
     def test_requirement_strings_appear_in_output(self, mock_env, mock_bin_dir):
@@ -559,7 +615,7 @@ exit 0
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         mock_env["PATH"] = str(mock_bin_dir)
@@ -568,7 +624,7 @@ exit 0
         # Check for requirement strings
         assert "requires 3.12+" in result.stdout, "Python requirement should appear"
         assert "requires 18+" in result.stdout, "Node.js requirement should appear"
-        assert "requires 3.0+" in result.stdout, "Pandoc requirement should appear"
+        assert "requires 3.8.2.1+" in result.stdout, "Pandoc requirement should appear"
 
 
 class TestExitCodes:
@@ -584,7 +640,7 @@ class TestExitCodes:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Mock python-frontmatter check
@@ -645,7 +701,7 @@ class TestLatexEngineDetection:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         mock_env["PATH"] = str(mock_bin_dir)
@@ -663,7 +719,7 @@ class TestLatexEngineDetection:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(
             mock_bin_dir, "pdflatex", "pdfTeX 3.141592653-2.6-1.40.24", 0
         )
@@ -684,7 +740,7 @@ class TestLatexEngineDetection:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(
             mock_bin_dir, "xelatex", "XeTeX 3.141592653-2.6-0.999995", 0
         )
@@ -712,7 +768,7 @@ class TestLatexEngineDetection:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "lualatex", "LuaTeX, Version 1.16.0", 0)
 
         # Create converter_config.json with different engine
@@ -785,7 +841,7 @@ class TestEdgeCases:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Simulate CI environment
@@ -812,7 +868,7 @@ class TestEdgeCases:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Ensure no config file exists
@@ -840,7 +896,7 @@ class TestChromiumConfiguration:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Create mock configure-chromium.sh that succeeds
@@ -866,7 +922,7 @@ class TestChromiumConfiguration:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Create mock configure-chromium.sh that fails
@@ -896,7 +952,7 @@ class TestPythonPackageVerification:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Mock pip show or python -m pip show
@@ -922,7 +978,7 @@ Summary: Parse and manage posts with YAML frontmatter
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Mock pip that returns error for missing package
@@ -950,7 +1006,7 @@ class TestRsvgConvertVerification:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
         create_mock_command(
             mock_bin_dir, "rsvg-convert", "rsvg-convert version 2.54.5", 0
@@ -974,7 +1030,7 @@ class TestRsvgConvertVerification:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
         # rsvg-convert not created - simulating missing dependency
 
@@ -998,7 +1054,7 @@ class TestMermaidCliVerification:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Mock npx that can run mermaid-cli
@@ -1029,7 +1085,7 @@ exit 1
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Mock npx that fails for mermaid-cli
@@ -1063,7 +1119,7 @@ class TestMalformedConfig:
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.1.11", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.8.2.1", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         # Create malformed converter_config.json

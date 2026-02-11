@@ -7,13 +7,14 @@ FAILURES=0
 
 # Helper function to extract version number from string
 # Usage: extract_version "Python 3.14.0" -> "3.14.0"
+#        extract_version "pandoc 3.8.2.1" -> "3.8.2.1"
 extract_version() {
     local input="$1"
     local result=""
 
     # Remove leading non-digit characters and extract version pattern
-    # This uses bash regex to find X.Y or X.Y.Z pattern
-    if [[ "$input" =~ ([0-9]+\.[0-9]+(\.[0-9]+)?) ]]; then
+    # Supports X.Y, X.Y.Z, and X.Y.Z.W (e.g. Pandoc 3.8.2.1)
+    if [[ "$input" =~ ([0-9]+\.[0-9]+(\.[0-9]+){0,2}) ]]; then
         result="${BASH_REMATCH[1]}"
     fi
 
@@ -29,40 +30,36 @@ get_first_line() {
 # Helper function to check version comparison
 # Usage: version_ge "actual_version" "required_version"
 # Returns 0 if actual >= required, 1 otherwise
+# Supports up to 4-part versions (X.Y.Z.W), e.g. "3.8.2.1"
 version_ge() {
     local actual="$1"
     local required="$2"
 
-    # Extract major and minor version numbers using bash parameter expansion
-    local actual_major="${actual%%.*}"
-    local actual_rest="${actual#*.}"
-    local actual_minor="${actual_rest%%.*}"
+    # Split versions into arrays using IFS
+    local IFS='.'
+    local -a actual_parts=($actual)
+    local -a required_parts=($required)
 
-    local required_major="${required%%.*}"
-    local required_rest="${required#*.}"
-    local required_minor="${required_rest%%.*}"
+    # Compare up to 4 parts
+    local i
+    for i in 0 1 2 3; do
+        local a="${actual_parts[$i]:-0}"
+        local r="${required_parts[$i]:-0}"
+        # Remove any non-numeric characters
+        a="${a//[!0-9]/}"
+        r="${r//[!0-9]/}"
+        [ -z "$a" ] && a=0
+        [ -z "$r" ] && r=0
 
-    # Remove any non-numeric characters from minor version
-    actual_minor="${actual_minor//[!0-9]/}"
-    required_minor="${required_minor//[!0-9]/}"
+        if [ "$a" -gt "$r" ]; then
+            return 0
+        elif [ "$a" -lt "$r" ]; then
+            return 1
+        fi
+    done
 
-    # Handle missing minor version
-    [ -z "$actual_minor" ] && actual_minor=0
-    [ -z "$required_minor" ] && required_minor=0
-
-    # Compare major version
-    if [ "$actual_major" -gt "$required_major" ]; then
-        return 0
-    elif [ "$actual_major" -lt "$required_major" ]; then
-        return 1
-    fi
-
-    # Major versions equal, compare minor
-    if [ "$actual_minor" -ge "$required_minor" ]; then
-        return 0
-    else
-        return 1
-    fi
+    # All parts equal
+    return 0
 }
 
 # Check Python 3.12+
@@ -140,7 +137,7 @@ else
     fi
 fi
 
-# Check Pandoc 3.0+
+# Check Pandoc 3.8.2.1+ (fixes unnumbered table counter bug jgm/pandoc#11201)
 if command -v pandoc &> /dev/null; then
     pandoc_version=$(pandoc --version 2>&1)
     if [ $? -eq 0 ]; then
@@ -148,10 +145,10 @@ if command -v pandoc &> /dev/null; then
         pandoc_first_line=$(get_first_line "$pandoc_version")
         pandoc_ver=$(extract_version "$pandoc_first_line")
         if [ -n "$pandoc_ver" ]; then
-            if version_ge "$pandoc_ver" "3.0"; then
-                echo "[✓] Pandoc $pandoc_ver (requires 3.0+)"
+            if version_ge "$pandoc_ver" "3.8.2.1"; then
+                echo "[✓] Pandoc $pandoc_ver (requires 3.8.2.1+)"
             else
-                echo "[✗] Pandoc $pandoc_ver (requires 3.0+) - version too low"
+                echo "[✗] Pandoc $pandoc_ver (requires 3.8.2.1+) - version too low"
                 FAILURES=$((FAILURES + 1))
             fi
         else
@@ -163,7 +160,7 @@ if command -v pandoc &> /dev/null; then
         FAILURES=$((FAILURES + 1))
     fi
 else
-    echo "[✗] Pandoc not found (requires 3.0+)"
+    echo "[✗] Pandoc not found (requires 3.8.2.1+)"
     FAILURES=$((FAILURES + 1))
 fi
 

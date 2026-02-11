@@ -153,14 +153,14 @@ Run the verification script to check all dependencies:
 
 Expected output when all dependencies are installed:
 ```
-[✓] Python 3.14.0 (requires 3.12+)
-[✓] Node.js 20.10.0 (requires 18+)
+[✓] Python 3.12.3 (requires 3.12+)
+[✓] Node.js 22.14.0 (requires 18+)
 [✓] Pandoc 3.8.2.1 (requires 3.8.2.1+)
 [✓] tectonic 0.15.0
 [✓] Chromium configured
-[✓] python-frontmatter installed
-[✓] rsvg-convert installed
-[✓] mermaid-cli available
+[✓] python-frontmatter 1.1.0
+[✓] rsvg-convert 2.52.5
+[✓] mermaid-cli 11.12.0
 ```
 
 **Manual verification** (if script is not available):

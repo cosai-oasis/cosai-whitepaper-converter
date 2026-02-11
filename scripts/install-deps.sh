@@ -110,7 +110,9 @@ check_sudo() {
     fi
 
     # Check if running as root (use $EUID which is a bash variable)
-    if [ "${EUID:-1000}" -eq 0 ] 2>/dev/null; then
+    # _TEST_EUID allows tests to override EUID (which is readonly in bash)
+    local effective_uid="${_TEST_EUID:-${EUID:-1000}}"
+    if [ "$effective_uid" -eq 0 ] 2>/dev/null; then
         SUDO=""
         return 0
     fi
