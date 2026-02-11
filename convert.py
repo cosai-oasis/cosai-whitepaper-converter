@@ -488,6 +488,7 @@ def main() -> None:
             f"--template={get_asset_path('cosai-template.tex')}",
             f"--pdf-engine={engine}",
             "--syntax-highlighting=idiomatic",
+            f"--resource-path={os.path.dirname(os.path.abspath(args.input_file)) or '.'}",
         ]
 
         if not args.debug:
