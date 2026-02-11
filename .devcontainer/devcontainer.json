@@ -3,18 +3,10 @@
 	"dockerFile": "Dockerfile",
 
 	"features": {
-		"ghcr.io/devcontainers/features/python:1": {
-			"version": "3.14"
-		},
-		"ghcr.io/devcontainers/features/node:1": {},
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {}
 	},
 
-	"onCreateCommand": {
-		"install-deps": "./scripts/install-deps.sh",
-		"pip-install": "pip install -r requirements.txt",
-		"npm-install": "npm install"
-	},
+	"onCreateCommand": "./scripts/install-deps.sh && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && npm install",
 
 	"customizations": {
 		"vscode": {
@@ -22,7 +14,7 @@
 				"charliermarsh.ruff"
 			],
 			"settings": {
-				"python.defaultInterpreterPath": "/usr/local/python/current/bin/python"
+				"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
 			}
 		}
 	},

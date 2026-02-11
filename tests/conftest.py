@@ -15,6 +15,19 @@ import json
 from pathlib import Path
 
 
+def pytest_configure(config):
+    """Apply default marker expression when -m is not specified on the CLI.
+
+    Allows explicit override: ``pytest -m integration`` or ``pytest -m ""``.
+    """
+    m_provided = any(
+        arg == "-m" or arg.startswith("-m=") or arg.startswith("--markexpr")
+        for arg in config.invocation_params.args
+    )
+    if not m_provided:
+        config.option.markexpr = "not integration and not slow"
+
+
 @pytest.fixture
 def temp_dir():
     """

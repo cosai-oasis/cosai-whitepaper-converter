@@ -582,12 +582,15 @@ class TestMainFunctionTempDirectory:
     @patch("convert.tempfile.TemporaryDirectory")
     @patch("convert.process_markdown")
     @patch("convert.subprocess.run")
+    @patch("convert.shutil.copy")
     def test_main_cleans_up_temp_directory_on_success(
         self,
+        mock_shutil_copy,
         mock_subprocess,
         mock_process_markdown,
         mock_temp_dir,
         mock_exists,
+        tmp_path,
     ):
         """
         Test that main() cleans up temp directory on successful completion.
@@ -605,33 +608,28 @@ class TestMainFunctionTempDirectory:
             "output.pdf",
         ]
 
-        # Setup mock temp directory
+        # Use a real temporary directory so open() calls succeed
         mock_temp_instance = MagicMock()
-        mock_temp_instance.__enter__.return_value = "/tmp/cosai_convert_test123"
+        mock_temp_instance.__enter__.return_value = str(tmp_path)
         mock_temp_dir.return_value = mock_temp_instance
 
         mock_process_markdown.return_value = "# Processed content"
         mock_subprocess.return_value = MagicMock(returncode=0)
 
         with patch("sys.argv", test_args):
-            try:
-                from convert import main
+            from convert import main
 
-                # Run main - currently won't use TemporaryDirectory
-                main()
+            main()
 
-                # This will FAIL until main() uses tempfile.TemporaryDirectory
-                assert mock_temp_dir.called, (
-                    "main() should create TemporaryDirectory for temp files"
-                )
-                assert mock_temp_instance.__enter__.called, (
-                    "TemporaryDirectory context manager should be entered"
-                )
-                assert mock_temp_instance.__exit__.called, (
-                    "TemporaryDirectory context manager should exit (cleanup)"
-                )
-            except ImportError:
-                pytest.fail("main() function not found in convert.py")
+            assert mock_temp_dir.called, (
+                "main() should create TemporaryDirectory for temp files"
+            )
+            assert mock_temp_instance.__enter__.called, (
+                "TemporaryDirectory context manager should be entered"
+            )
+            assert mock_temp_instance.__exit__.called, (
+                "TemporaryDirectory context manager should exit (cleanup)"
+            )
 
     @patch("convert.os.path.exists")
     @patch("convert.tempfile.TemporaryDirectory")

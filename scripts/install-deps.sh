@@ -746,8 +746,8 @@ install_nodejs18_apt() {
         fi
     fi
 
-    # Install via NodeSource (Node.js 20 LTS)
-    log_info "Setting up NodeSource repository for Node.js 20..."
+    # Install via NodeSource (Node.js 22 LTS)
+    log_info "Setting up NodeSource repository for Node.js 22..."
 
     # NodeSource setup requires curl
     if ! command -v curl >/dev/null 2>&1; then
@@ -761,7 +761,7 @@ install_nodejs18_apt() {
     # (Using temp file to avoid pipe issues with SUDO expansion)
     local tmp_setup
     tmp_setup=$(mktemp)
-    if curl -fsSL https://deb.nodesource.com/setup_20.x -o "$tmp_setup" 2>/dev/null; then
+    if curl -fsSL https://deb.nodesource.com/setup_22.x -o "$tmp_setup" 2>/dev/null; then
         if [ -n "$SUDO" ]; then
             $SUDO -E bash "$tmp_setup" >/dev/null 2>&1 || {
                 rm -f "$tmp_setup"
