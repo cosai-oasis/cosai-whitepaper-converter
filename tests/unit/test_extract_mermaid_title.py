@@ -8,6 +8,8 @@ application functionality.
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -163,21 +165,20 @@ graph TD
         assert title is None or isinstance(title, str)
         assert isinstance(code, str)
 
+    def test_extract_mermaid_title_malformed_yaml_exits_with_error(self, capsys):
+        """
+        Given: Mermaid code with syntactically invalid YAML frontmatter
+        When: extract_mermaid_title is called
+        Then: Exits with code 1 and prints a diagnostic to stderr
+        """
+        mermaid_code = (
+            "---\nconfig:\n theme: neutral\n  layout: elk\n---\ngraph TD\n    A --> B"
+        )
 
-"""
-Test Summary
-============
-Total Tests: 7
-- Happy Path: 4
-- Edge Cases: 3
-- Error Conditions: 0
+        with pytest.raises(SystemExit) as exc_info:
+            extract_mermaid_title(mermaid_code)
 
-Coverage Areas:
-- Title extraction from YAML frontmatter
-- Title removal from code
-- CoSAI theme injection
-- Config preservation
-- Complex diagram handling
-- Empty title handling
-- Return type validation
-"""
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "Invalid YAML frontmatter" in captured.err
+        assert "graph TD" in captured.err

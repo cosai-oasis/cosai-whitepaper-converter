@@ -165,8 +165,24 @@ def extract_mermaid_title(mermaid_code: str) -> tuple[str | None, str]:
 
     Returns:
         A tuple of (title, code_without_title) where title is None if not found.
+
+    Raises:
+        SystemExit: If the YAML frontmatter in the Mermaid block is malformed.
     """
-    doc = frontmatter.loads(mermaid_code)
+    try:
+        doc = frontmatter.loads(mermaid_code)
+    except Exception as exc:
+        # Show the first few lines of the block so the user can locate it
+        preview = "\n".join(mermaid_code.splitlines()[:6])
+        print(
+            f"\nError: Invalid YAML frontmatter in Mermaid block:\n"
+            f"  {exc}\n\n"
+            f"  Block starts with:\n"
+            f"  ```mermaid\n{preview}\n  ```\n\n"
+            f"  Hint: Check indentation, quoting, and use ':' not '=' for YAML keys.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     title = None
     if "title" in doc.metadata:
         title = str(doc.metadata["title"])
