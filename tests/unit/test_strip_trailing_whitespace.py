@@ -2,7 +2,8 @@
 Tests for strip_trailing_whitespace function.
 
 This module tests the whitespace stripping functionality that removes
-trailing whitespace from each line while preserving line structure.
+trailing whitespace from each line while preserving Markdown hard line
+breaks (2+ trailing spaces) and line structure.
 """
 
 import sys
@@ -19,14 +20,14 @@ class TestStripTrailingWhitespace:
 
     def test_strip_trailing_whitespace_single_line_with_spaces(self):
         """
-        Test trailing space removal from single line.
+        Test trailing space handling from single line.
 
-        Given: A single line with trailing spaces
+        Given: A single line with 3 trailing spaces (Markdown hard break)
         When: strip_trailing_whitespace is called
-        Then: Trailing spaces are removed
+        Then: Exactly 2 trailing spaces are preserved (hard break normalized)
         """
         text = "Hello World   "
-        expected = "Hello World"
+        expected = "Hello World  "
 
         result = strip_trailing_whitespace(text)
 
@@ -49,30 +50,14 @@ class TestStripTrailingWhitespace:
 
     def test_strip_trailing_whitespace_multiple_lines(self):
         """
-        Test trailing whitespace removal from multiple lines.
+        Test trailing whitespace handling from multiple lines.
 
         Given: Multiple lines with varying trailing whitespace
         When: strip_trailing_whitespace is called
-        Then: All trailing whitespace is removed, line structure preserved
+        Then: Hard breaks (2+ spaces) preserved, tabs stripped, line structure preserved
         """
         text = "Line 1   \nLine 2\t\t\nLine 3  \n"
-        # Note: Function uses splitlines then joins with \n, which doesn't preserve final \n
-        expected = "Line 1\nLine 2\nLine 3"
-
-        result = strip_trailing_whitespace(text)
-
-        assert result == expected
-
-    def test_strip_trailing_whitespace_preserves_leading_whitespace(self):
-        """
-        Test that leading whitespace is preserved.
-
-        Given: Lines with leading whitespace
-        When: strip_trailing_whitespace is called
-        Then: Leading whitespace remains, trailing removed
-        """
-        text = "  Indented line  \n    More indented  "
-        expected = "  Indented line\n    More indented"
+        expected = "Line 1  \nLine 2\nLine 3  "
 
         result = strip_trailing_whitespace(text)
 
@@ -109,51 +94,82 @@ class TestStripTrailingWhitespace:
 
         assert result == expected
 
-    def test_strip_trailing_whitespace_mixed_line_endings(self):
-        """
-        Test handling of different line ending styles.
-
-        Given: Text with mixed line endings (LF)
-        When: strip_trailing_whitespace is called
-        Then: Whitespace is stripped, line structure preserved
-        """
-        text = "Line 1  \nLine 2  \nLine 3  "
-        expected = "Line 1\nLine 2\nLine 3"
-
-        result = strip_trailing_whitespace(text)
-
-        assert result == expected
-
     def test_strip_trailing_whitespace_preserves_internal_spaces(self):
         """
         Test that internal spaces within lines are preserved.
 
-        Given: Lines with spaces between words
+        Given: Lines with spaces between words and trailing spaces
         When: strip_trailing_whitespace is called
-        Then: Internal spaces preserved, trailing removed
+        Then: Internal spaces preserved, hard breaks preserved
         """
         text = "Hello   World   \nFoo  Bar  "
-        expected = "Hello   World\nFoo  Bar"
+        expected = "Hello   World  \nFoo  Bar  "
 
         result = strip_trailing_whitespace(text)
 
         assert result == expected
 
+    def test_preserves_hard_line_break_two_trailing_spaces(self):
+        """
+        Given: A line ending with exactly two trailing spaces (Markdown hard break)
+        When: strip_trailing_whitespace is called
+        Then: Exactly two trailing spaces are preserved
+        """
+        text = "First line  \nSecond line"
+        expected = "First line  \nSecond line"
 
-"""
-Test Summary
-============
-Total Tests: 8
-- Happy Path: 3
-- Edge Cases: 5
-- Error Conditions: 0
+        result = strip_trailing_whitespace(text)
 
-Coverage Areas:
-- Single line whitespace stripping
-- Multi-line whitespace stripping
-- Whitespace type handling (spaces, tabs)
-- Leading whitespace preservation
-- Internal whitespace preservation
-- Empty input handling
-- Whitespace-only lines
-"""
+        assert result == expected
+
+    def test_preserves_hard_line_break_more_than_two_trailing_spaces(self):
+        """
+        Given: A line ending with more than two trailing spaces
+        When: strip_trailing_whitespace is called
+        Then: Exactly two trailing spaces are preserved (normalized)
+        """
+        text = "First line     \nSecond line"
+        expected = "First line  \nSecond line"
+
+        result = strip_trailing_whitespace(text)
+
+        assert result == expected
+
+    def test_strips_single_trailing_space(self):
+        """
+        Given: A line ending with exactly one trailing space (not a hard break)
+        When: strip_trailing_whitespace is called
+        Then: The single trailing space is stripped
+        """
+        text = "Not a break \nNext line"
+        expected = "Not a break\nNext line"
+
+        result = strip_trailing_whitespace(text)
+
+        assert result == expected
+
+    def test_hard_break_with_leading_whitespace(self):
+        """
+        Given: An indented line ending with two trailing spaces
+        When: strip_trailing_whitespace is called
+        Then: Leading whitespace preserved, two trailing spaces preserved
+        """
+        text = "    Indented line  \nNext"
+        expected = "    Indented line  \nNext"
+
+        result = strip_trailing_whitespace(text)
+
+        assert result == expected
+
+    def test_multiple_hard_breaks_in_text(self):
+        """
+        Given: Multiple lines with hard breaks mixed with normal lines
+        When: strip_trailing_whitespace is called
+        Then: Hard breaks preserved, normal trailing whitespace stripped
+        """
+        text = "Line A  \nLine B   \nLine C \nLine D  "
+        expected = "Line A  \nLine B  \nLine C\nLine D  "
+
+        result = strip_trailing_whitespace(text)
+
+        assert result == expected

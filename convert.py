@@ -343,21 +343,28 @@ def strip_blockquote_prefix(text: str) -> str:
 def strip_trailing_whitespace(text: str) -> str:
     """Return a copy of text with trailing whitespace removed from every line.
 
-    The function preserves the line count of the input string.
+    Markdown hard line breaks (2+ trailing spaces) are preserved as exactly
+    two trailing spaces so Pandoc can emit the correct ``\\newline``.
 
     Args:
         text: The multiline string to process.
 
     Returns:
-        A new string with trailing whitespace removed from each line.
+        A new string with trailing whitespace removed from each line,
+        except lines that use Markdown hard breaks (2+ trailing spaces).
     """
-    # Split the text into lines **including** the line‑endings.
-    # The ``keepends=True`` flag keeps ``\n``/``\r\n``/``\r`` attached.
     lines: Iterable[str] = text.splitlines(keepends=True)
 
     processed_lines = []
     for line in lines:
-        processed_lines.append(line.rstrip())
+        content = line.rstrip("\n\r")
+        stripped = content.rstrip()
+        # 2+ trailing spaces → Markdown hard line break; preserve exactly 2
+        # (but only when there is actual text content, not whitespace-only lines)
+        if stripped and len(content) - len(stripped) >= 2 and content.endswith("  "):
+            processed_lines.append(stripped + "  ")
+        else:
+            processed_lines.append(stripped)
     return "\n".join(processed_lines)
 
 

@@ -19,9 +19,13 @@
     ItalicFont = *-Italic,
     BoldItalicFont = *-BoldItalic,
     FontFace = {el}{n}{*-ExtraLight},
+    FontFace = {el}{it}{*-ExtraLightItalic},
     FontFace = {l}{n}{*-Light},
+    FontFace = {l}{it}{*-LightItalic},
     FontFace = {mb}{n}{*-Medium},
+    FontFace = {mb}{it}{*-MediumItalic},
     FontFace = {sb}{n}{*-SemiBold},
+    FontFace = {sb}{it}{*-SemiBoldItalic},
   ]
   \setsansfont{Montserrat}[
     Extension = .otf,
@@ -30,9 +34,13 @@
     ItalicFont = *-Italic,
     BoldItalicFont = *-MediumItalic,
     FontFace = {el}{n}{*-ExtraLight},
+    FontFace = {el}{it}{*-ExtraLightItalic},
     FontFace = {l}{n}{*-Light},
+    FontFace = {l}{it}{*-LightItalic},
     FontFace = {mb}{n}{*-Medium},
+    FontFace = {mb}{it}{*-MediumItalic},
     FontFace = {sb}{n}{*-SemiBold},
+    FontFace = {sb}{it}{*-SemiBoldItalic},
   ]
 \fi
 
@@ -88,11 +96,11 @@
 \newcommand{\sectionWeight}{l}         % Font weight (el, l, m, sb, b)
 
 % --- Subsection Headings (e.g., ## Heading in markdown) ---
-\newcommand{\subsectionSize}{\large}    % Size command
+\newcommand{\subsectionSize}{\Large}    % Size command
 \newcommand{\subsectionWeight}{l}      % Font weight
 
 % --- Subsubsection Headings (e.g., ### Heading in markdown) ---
-\newcommand{\subsubsectionSize}{\normalsize}  % Size command
+\newcommand{\subsubsectionSize}{\large}       % Size command
 \newcommand{\subsubsectionWeight}{l}          % Font weight
 
 % --- Figure Captions ---
@@ -245,18 +253,43 @@
   {0pt}
   {}
   [{\color{cosaiGreen}\makebox[0.75\textwidth][l]{\rule{0.75\textwidth}{1pt}}}]
+\titlespacing*{\section}{0pt}{16pt}{6pt}
 
 \titleformat{\subsection}
   {\color{cosaiDarkBlue}\fontseries{\subsectionWeight}\selectfont\subsectionSize}
   {}
   {0pt}
   {}
+\titlespacing*{\subsection}{0pt}{12pt}{4pt}
 
 \titleformat{\subsubsection}
   {\color{cosaiDarkBlue}\fontseries{\subsubsectionWeight}\selectfont\subsubsectionSize}
   {}
   {0pt}
   {}
+\titlespacing*{\subsubsection}{0pt}{10pt}{3pt}
+
+% paragraph (####) — block-style heading, not LaTeX default run-in
+\titleformat{\paragraph}
+  {\color{cosaiDarkBlue}\fontseries{m}\selectfont\normalsize}
+  {}
+  {0pt}
+  {}
+\titlespacing*{\paragraph}{0pt}{8pt}{2pt}
+
+% subparagraph (#####) — block-style heading, not LaTeX default run-in
+\titleformat{\subparagraph}
+  {\color{cosaiDarkBlue}\fontseries{m}\selectfont\small}
+  {}
+  {0pt}
+  {}
+\titlespacing*{\subparagraph}{0pt}{6pt}{2pt}
+
+% --- Blockquote Spacing ---
+% Tighten spacing between consecutive blockquote environments
+\renewenvironment{quote}
+  {\list{}{\leftmargin=2em\rightmargin=0pt\topsep=2pt\parsep=0pt\partopsep=0pt}\item\relax}
+  {\endlist}
 
 % --- GFM Callout / Alert Support ---
 \tcbuselibrary{skins, breakable}
