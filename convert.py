@@ -169,7 +169,7 @@ def extract_mermaid_title(mermaid_code: str) -> tuple[str | None, str]:
     doc = frontmatter.loads(mermaid_code)
     title = None
     if "title" in doc.metadata:
-        title = doc.metadata["title"]
+        title = str(doc.metadata["title"])
         del doc.metadata["title"]
     # define a unified CoSAI mermaid style
     if "config" not in doc.metadata:
@@ -190,7 +190,7 @@ def extract_mermaid_title(mermaid_code: str) -> tuple[str | None, str]:
                 "fontFamily": '"IBM Plex Sans", sans-serif',
             },
         }
-    return title, frontmatter.dumps(doc)
+    return title, str(frontmatter.dumps(doc))
 
 
 def convert_mermaid_to_svg(
@@ -299,6 +299,47 @@ def download_image(url: str, index: int, temp_dir: str | None = None) -> str | N
         return None
 
 
+def strip_blockquote_prefix(text: str) -> str:
+    """Strip Markdown blockquote `> ` prefixes from Mermaid block content.
+
+    Applies an all-or-nothing rule: prefixes are only stripped when every
+    non-empty line starts with `>`. This prevents accidentally corrupting
+    content that is not fully blockquoted.
+
+    Each line is processed as follows:
+    - `> content` becomes `content`  (strips `> ` with trailing space)
+    - `>content`  becomes `content`  (strips bare `>`)
+    - `>`         becomes ``         (empty string)
+    - empty line  stays empty
+
+    Args:
+        text: Mermaid block content extracted by regex, possibly with `> ` prefixes.
+
+    Returns:
+        Text with blockquote prefixes removed, or the original text if not all
+        non-empty lines carry a `>` prefix.
+    """
+    if not text:
+        return text
+
+    lines = text.split("\n")
+    non_empty_lines = [line for line in lines if line]
+
+    # Safety rule: only strip when every non-empty line starts with `>`
+    if not non_empty_lines or not all(line.startswith(">") for line in non_empty_lines):
+        return text
+
+    stripped_lines = []
+    for line in lines:
+        if line.startswith("> "):
+            stripped_lines.append(line[2:])
+        elif line.startswith(">"):
+            stripped_lines.append(line[1:])
+        else:
+            stripped_lines.append(line)
+    return "\n".join(stripped_lines)
+
+
 def strip_trailing_whitespace(text: str) -> str:
     """Return a copy of text with trailing whitespace removed from every line.
 
@@ -374,6 +415,7 @@ def process_markdown(
     def mermaid_replacer(match):
         nonlocal diagram_count
         mermaid_code = match.group(1)
+        mermaid_code = strip_blockquote_prefix(mermaid_code)
         svg_filename, title = convert_mermaid_to_svg(
             mermaid_code, diagram_count, temp_dir=temp_dir
         )
