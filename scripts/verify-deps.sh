@@ -137,7 +137,7 @@ else
     fi
 fi
 
-# Check Pandoc 3.8.2.1+ (fixes unnumbered table counter bug jgm/pandoc#11201)
+# Check Pandoc 3.9+ (3.9 adds +alerts extension for GFM callouts)
 if command -v pandoc &> /dev/null; then
     pandoc_version=$(pandoc --version 2>&1)
     if [ $? -eq 0 ]; then
@@ -145,10 +145,10 @@ if command -v pandoc &> /dev/null; then
         pandoc_first_line=$(get_first_line "$pandoc_version")
         pandoc_ver=$(extract_version "$pandoc_first_line")
         if [ -n "$pandoc_ver" ]; then
-            if version_ge "$pandoc_ver" "3.8.2.1"; then
-                echo "[✓] Pandoc $pandoc_ver (requires 3.8.2.1+)"
+            if version_ge "$pandoc_ver" "3.9"; then
+                echo "[✓] Pandoc $pandoc_ver (requires 3.9+)"
             else
-                echo "[✗] Pandoc $pandoc_ver (requires 3.8.2.1+) - version too low"
+                echo "[✗] Pandoc $pandoc_ver (requires 3.9+) - version too low"
                 FAILURES=$((FAILURES + 1))
             fi
         else
@@ -160,7 +160,7 @@ if command -v pandoc &> /dev/null; then
         FAILURES=$((FAILURES + 1))
     fi
 else
-    echo "[✗] Pandoc not found (requires 3.8.2.1+)"
+    echo "[✗] Pandoc not found (requires 3.9+)"
     FAILURES=$((FAILURES + 1))
 fi
 

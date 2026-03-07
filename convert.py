@@ -27,6 +27,108 @@ DEFAULT_LATEX_ENGINE = "tectonic"
 CONFIG_FILE_NAME = "converter_config.json"
 
 
+class ConversionError(Exception):
+    """Typed exception for conversion pipeline failures.
+
+    Carries a user-facing message, an optional technical detail, and an
+    optional reference to the input file that triggered the error.
+
+    Attributes:
+        user_message: Short, human-readable description of the problem.
+        detail: Optional longer technical detail (e.g. raw exception text).
+        input_file: Optional path to the file that caused the error.
+    """
+
+    def __init__(
+        self,
+        user_message: str,
+        detail: str | None = None,
+        input_file: str | None = None,
+    ) -> None:
+        super().__init__(user_message)
+        self.user_message = user_message
+        self.detail = detail
+        self.input_file = input_file
+
+    def __str__(self) -> str:
+        return self.user_message
+
+
+def format_pandoc_error(
+    stderr: str,
+    input_file: str,
+    engine: str,
+    debug: bool = False,
+) -> str:
+    """Format raw pandoc stderr into actionable user-facing text.
+
+    Applies these transformations:
+    - Replaces ``processed.md`` with the user's actual input filename.
+    - Replaces ``/tmp/cosai_convert_*/`` temp paths with ``<temp>/``.
+    - Appends YAML colon-quoting guidance when a YAML parse error is detected.
+    - Truncates to 40 lines and appends a ``--debug`` hint when ``debug=False``
+      and the stderr exceeds 40 lines.
+
+    Args:
+        stderr: Raw stderr output from pandoc.
+        input_file: User-supplied input filename shown in place of ``processed.md``.
+        engine: LaTeX engine name (currently unused; reserved for future use).
+        debug: When True, preserve full stderr without truncation hint.
+
+    Returns:
+        Formatted error string, or empty string if ``stderr`` is empty.
+    """
+    if not stderr:
+        return ""
+
+    # Replace internal temp filenames with user-visible names
+    text = stderr.replace("processed.md", input_file)
+
+    # Replace temp directory paths with a short placeholder
+    text = re.sub(r"/tmp/cosai_convert_[^/]+/", "<temp>/", text)
+
+    # Detect YAML parse errors and append quoting guidance
+    if "YAML" in text or "mapping values" in text:
+        text += (
+            "\nHint: YAML frontmatter values that contain colons must be quoted, "
+            'e.g.  title: "My Title: A Subtitle"'
+        )
+
+    # Truncate long output when not in debug mode
+    lines = text.splitlines()
+    if not debug and len(lines) > 40:
+        text = (
+            "\n".join(lines[:40])
+            + "\n(output truncated — rerun with --debug for full output)"
+        )
+
+    return text
+
+
+def format_mermaid_error(stderr: str, index: int, mermaid_code: str) -> str:
+    """Format mermaid-cli stderr into a diagnostic message with diagram context.
+
+    Args:
+        stderr: Raw stderr output from mermaid-cli.
+        index: Zero-based diagram index; displayed to the user as 1-based.
+        mermaid_code: Raw Mermaid source code for the failing diagram.
+
+    Returns:
+        A formatted error string containing the diagram number, a 3-line
+        preview of the source code, and the stderr detail (if any).
+    """
+    diagram_number = index + 1
+    preview_lines = mermaid_code.splitlines()[:3]
+    preview = "\n".join(preview_lines)
+
+    parts = [f"Failed to render diagram {diagram_number}:"]
+    parts.append(f"  Preview:\n{preview}")
+    if stderr:
+        parts.append(f"  Error: {stderr}")
+
+    return "\n".join(parts)
+
+
 def get_asset_path(filename: str) -> str:
     """
     Get asset path, checking assets/ first, then root for backward compat.
@@ -167,22 +269,23 @@ def extract_mermaid_title(mermaid_code: str) -> tuple[str | None, str]:
         A tuple of (title, code_without_title) where title is None if not found.
 
     Raises:
-        SystemExit: If the YAML frontmatter in the Mermaid block is malformed.
+        ConversionError: If the YAML frontmatter in the Mermaid block is malformed.
     """
     try:
         doc = frontmatter.loads(mermaid_code)
     except Exception as exc:
         # Show the first few lines of the block so the user can locate it
         preview = "\n".join(mermaid_code.splitlines()[:6])
-        print(
-            f"\nError: Invalid YAML frontmatter in Mermaid block:\n"
-            f"  {exc}\n\n"
-            f"  Block starts with:\n"
-            f"  ```mermaid\n{preview}\n  ```\n\n"
-            f"  Hint: Check indentation, quoting, and use ':' not '=' for YAML keys.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        raise ConversionError(
+            user_message=(
+                f"Invalid YAML frontmatter in mermaid block:\n"
+                f"  {exc}\n\n"
+                f"  Block starts with:\n"
+                f"  ```mermaid\n{preview}\n  ```\n\n"
+                f"  Hint: Check indentation, quoting, and use ':' not '=' for YAML keys."
+            ),
+            detail=str(exc),
+        ) from exc
     title = None
     if "title" in doc.metadata:
         title = str(doc.metadata["title"])
@@ -228,6 +331,12 @@ def convert_mermaid_to_svg(
 
     Returns:
         A tuple of (svg_filename, title) where both may be None on failure.
+
+    Raises:
+        ConversionError: If the Mermaid block contains malformed YAML frontmatter.
+            This propagates from extract_mermaid_title() and is intentional — malformed
+            YAML is an authoring error that should abort the entire conversion rather
+            than silently skip the diagram.
     """
     # Extract title before conversion
     title, code_without_title = extract_mermaid_title(mermaid_code)
@@ -261,9 +370,8 @@ def convert_mermaid_to_svg(
     try:
         subprocess.run(cmd, check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
-        print(f"❌ Failed to render diagram {index}", file=sys.stderr)
-        if e.stderr:
-            print(e.stderr.decode(), file=sys.stderr)
+        stderr_text = e.stderr.decode() if e.stderr else ""
+        print(format_mermaid_error(stderr_text, index, mermaid_code), file=sys.stderr)
         return None, None
     finally:
         if os.path.exists(tmp_mmd):
@@ -310,8 +418,8 @@ def download_image(url: str, index: int, temp_dir: str | None = None) -> str | N
         if temp_dir:
             return os.path.basename(tmp_img)
         return tmp_img
-    except Exception:
-        print(f"❌ Failed to download image: {url}", file=sys.stderr)
+    except Exception as exc:
+        print(f"❌ Failed to download image: {url}: {exc}", file=sys.stderr)
         return None
 
 
@@ -384,6 +492,20 @@ def strip_trailing_whitespace(text: str) -> str:
     return "\n".join(processed_lines)
 
 
+def strip_html_comment_attributes(content: str) -> str:
+    """Strip HTML comment wrappers from Pandoc/LaTeX directives.
+
+    Converts ``<!--{width=55%}-->`` to ``{width=55%}`` and
+    ``<!--\\newpage-->`` to ``\\newpage`` so that directives hidden from
+    GitHub rendering are still picked up by Pandoc.
+    """
+    # Pandoc attribute blocks: <!--{width=55%}--> → {width=55%}
+    content = re.sub(r"<!--(\{[^}]+\})-->", r"\1", content)
+    # Raw LaTeX commands: <!--\newpage--> → \newpage
+    content = re.sub(r"<!--(\\[a-zA-Z]+)-->", r"\1", content)
+    return content
+
+
 def process_markdown(
     input_file: str, engine: str | None = None, temp_dir: str | None = None
 ) -> str:
@@ -394,9 +516,10 @@ def process_markdown(
     2. Normalize Unicode characters (for pdflatex)
     3. Remove manual Table of Contents sections
     4. Convert HTML anchor tags to Pandoc format
-    5. Convert Mermaid diagrams to SVG images
-    6. Download remote images to local files
-    7. Convert HTML break tags to LaTeX newlines
+    5. Strip HTML comment wrappers from Pandoc attributes
+    6. Convert Mermaid diagrams to SVG images
+    7. Download remote images to local files
+    8. Convert HTML break tags to LaTeX newlines
 
     Args:
         input_file: Path to the input Markdown file.
@@ -411,12 +534,13 @@ def process_markdown(
     with open(input_file, "r") as f:
         content = f.read()
 
+    # 1. Strip trailing whitespace
     content = strip_trailing_whitespace(content)
 
-    # Normalize Unicode characters for LaTeX engine compatibility
+    # 2. Normalize Unicode characters for LaTeX engine compatibility
     content = normalize_unicode_for_latex(content, engine)
 
-    # 1. Remove "Table of Contents" section
+    # 3. Remove "Table of Contents" section
     # Regex to match "# Table of contents" (case insensitive) and the following list
     # Matches until the next header or end of string
     toc_pattern = re.compile(
@@ -424,12 +548,17 @@ def process_markdown(
     )
     content = toc_pattern.sub("", content)
 
-    # 2. Convert HTML anchor tags to Markdown anchors
+    # 4. Convert HTML anchor tags to Markdown anchors
     # Replace <a id="anchor-name"></a> with []{#anchor-name}
     anchor_pattern = re.compile(r'<a id="([^"]+)"></a>')
     content = anchor_pattern.sub(r"[]{#\1}", content)
 
-    # 3. Handle Mermaid blocks
+    # 5. Strip HTML comment wrappers from Pandoc attributes
+    # Converts <!--{width=55%}--> to {width=55%} so attributes hidden from
+    # GitHub rendering are still picked up by Pandoc
+    content = strip_html_comment_attributes(content)
+
+    # 6. Handle Mermaid blocks
     # Regex to find mermaid code blocks: ```mermaid ... ```
     mermaid_pattern = re.compile(r"```mermaid\n(.*?)```", re.DOTALL)
 
@@ -453,7 +582,7 @@ def process_markdown(
 
     content = mermaid_pattern.sub(mermaid_replacer, content)
 
-    # 4. Handle Remote Images
+    # 7. Handle Remote Images
     # Regex to find image links: ![alt](url)
     # We are looking for http/https urls
     image_pattern = re.compile(r"!\[(.*?)\]\((http[s]?://.*?)\)")
@@ -475,7 +604,7 @@ def process_markdown(
 
     content = image_pattern.sub(image_replacer, content)
 
-    # 5. Replace HTML <br /> tags with LaTeX line breaks
+    # 8. Replace HTML <br /> tags with LaTeX line breaks
     content = content.replace("<br />", " \\newline ")
     content = content.replace("<br/>", " \\newline ")
     content = content.replace("<br>", " \\newline ")
@@ -523,7 +652,13 @@ def main() -> None:
     # Use temporary directory for all conversion artifacts
     with tempfile.TemporaryDirectory(prefix="cosai_convert_") as temp_dir:
         # Process markdown with temp directory for diagrams and images
-        processed_content = process_markdown(args.input_file, engine, temp_dir=temp_dir)
+        try:
+            processed_content = process_markdown(
+                args.input_file, engine, temp_dir=temp_dir
+            )
+        except ConversionError as exc:
+            print(f"❌ {exc}", file=sys.stderr)
+            sys.exit(1)
 
         # Create temporary file for processed markdown in temp directory
         tmp_md_path = os.path.join(temp_dir, "processed.md")
@@ -583,13 +718,23 @@ def main() -> None:
                     cmd, cwd=temp_dir, capture_output=True, text=True
                 )
             if result.returncode != 0:
+                stderr_text = result.stderr or ""
+                formatted = format_pandoc_error(
+                    stderr_text,
+                    input_file=os.path.basename(args.input_file),
+                    engine=engine,
+                    debug=args.debug,
+                )
                 print(f"❌ Conversion failed ({engine})", file=sys.stderr)
-                if hasattr(result, "stderr") and result.stderr:
-                    print(result.stderr, file=sys.stderr)
+                if formatted:
+                    print(formatted, file=sys.stderr)
                 sys.exit(1)
             print(f"✅ {output_path}")
         except FileNotFoundError:
-            print("❌ pandoc not found", file=sys.stderr)
+            print(
+                "❌ pandoc not found. Install it from https://pandoc.org/installing.html",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         # Save debug artifacts alongside the output PDF

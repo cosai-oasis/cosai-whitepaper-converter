@@ -908,28 +908,18 @@ def test_readme_is_markdown_formatted():
         "README should contain Markdown headings"
 
 
-def test_feature_json_has_no_extra_unexpected_fields():
+def test_feature_json_keys_are_valid_strings():
     """
-    Test that devcontainer-feature.json has reasonable structure.
+    Test that devcontainer-feature.json top-level keys are valid.
 
     Given: devcontainer-feature.json parsed successfully
     When: Checking top-level keys
-    Then: Only expected keys are present (avoid typos)
+    Then: All keys are non-empty strings
     """
     with open(FEATURE_JSON) as f:
         data = json.load(f)
 
-    expected_keys = {
-        "id", "version", "name", "description", "documentationURL",
-        "options", "containerEnv", "installsAfter", "init", "postCreateCommand"
-    }
-
-    actual_keys = set(data.keys())
-    unexpected = actual_keys - expected_keys
-
-    # Having unexpected keys might be fine, but we should document this
-    # For now, we just check that we don't have obvious typos
-    for key in actual_keys:
+    for key in data.keys():
         assert isinstance(key, str), f"Key must be string, got {type(key)}"
         assert len(key) > 0, "Key must not be empty"
 

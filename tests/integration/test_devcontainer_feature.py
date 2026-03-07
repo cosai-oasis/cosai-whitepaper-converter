@@ -23,8 +23,6 @@ They will be skipped in environments without Docker.
 
 import pytest
 import subprocess
-import json
-import tempfile
 import shutil
 from pathlib import Path
 

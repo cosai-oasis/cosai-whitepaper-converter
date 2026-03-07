@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Extract feature version from tag
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/feature-v')
@@ -66,32 +66,19 @@ jobs:
 
           echo "Version matches: $MANIFEST_VERSION"
 
-  # Python unit tests (reusable workflow)
-  test-python:
-    name: Test Python
-    uses: ./.github/workflows/test-python.yaml
-
-  # Full install script tests (reusable workflow)
-  test-install:
-    name: Test Install Scripts
-    uses: ./.github/workflows/test-install.yaml
-
-  # Devcontainer CLI scenario tests (reusable workflow)
-  test-feature:
-    name: Test Feature Scenarios
-    uses: ./.github/workflows/test-feature.yaml
-
   # Publish to GitHub Container Registry
+  # Tests are not re-run here — they already passed on the PR and push-to-main
+  # that produced the commit this tag points to.
   publish:
     name: Publish to GHCR
     runs-on: ubuntu-latest
-    needs: [validate, test-python, test-install, test-feature]
+    needs: [validate]
     permissions:
       contents: write
       packages: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Extract feature version
         id: version
@@ -102,7 +89,7 @@ jobs:
 
       - name: Log in to GitHub Container Registry
         if: inputs.dry_run != true
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -116,7 +103,7 @@ jobs:
       # ghcr.io/{owner}/{repo}/{feature-id}
       - name: Publish devcontainer feature
         if: inputs.dry_run != true
-        uses: devcontainers/action@v1
+        uses: devcontainers/action@1082abd5d2bf3a11abccba70eef98df068277772 # v1.4.3
         with:
           publish-features: true
           base-path-to-features: src
@@ -135,7 +122,7 @@ jobs:
 
       - name: Create GitHub Release
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/feature-v') && inputs.dry_run != true
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         with:
           body: |
             ## Feature Published Successfully
@@ -184,20 +171,13 @@ jobs:
   notify:
     name: Notify
     runs-on: ubuntu-latest
-    needs: [validate, test-python, test-install, test-feature, publish]
+    needs: [validate, publish]
     if: always()
     steps:
       - name: Check workflow status
         run: |
-          # Treat success and skipped as acceptable outcomes
           if [ "${{ needs.validate.result }}" != "failure" ] && \
              [ "${{ needs.validate.result }}" != "cancelled" ] && \
-             [ "${{ needs.test-python.result }}" != "failure" ] && \
-             [ "${{ needs.test-python.result }}" != "cancelled" ] && \
-             [ "${{ needs.test-install.result }}" != "failure" ] && \
-             [ "${{ needs.test-install.result }}" != "cancelled" ] && \
-             [ "${{ needs.test-feature.result }}" != "failure" ] && \
-             [ "${{ needs.test-feature.result }}" != "cancelled" ] && \
              [ "${{ needs.publish.result }}" != "failure" ] && \
              [ "${{ needs.publish.result }}" != "cancelled" ]; then
             echo "SUCCESS: Feature published successfully"
@@ -205,11 +185,8 @@ jobs:
             echo "exit_code=0" >> $GITHUB_ENV
           else
             echo "FAILURE: Workflow failed"
-            echo "  Validate result:      ${{ needs.validate.result }}"
-            echo "  Test python result:   ${{ needs.test-python.result }}"
-            echo "  Test install result:  ${{ needs.test-install.result }}"
-            echo "  Test feature result:  ${{ needs.test-feature.result }}"
-            echo "  Publish result:       ${{ needs.publish.result }}"
+            echo "  Validate result:  ${{ needs.validate.result }}"
+            echo "  Publish result:   ${{ needs.publish.result }}"
             echo "status=failure" >> $GITHUB_ENV
             echo "exit_code=1" >> $GITHUB_ENV
           fi

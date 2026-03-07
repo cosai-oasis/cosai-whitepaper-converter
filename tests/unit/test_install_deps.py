@@ -53,7 +53,7 @@ def mock_bin_dir(tmp_path):
     """
     Create a temporary bin directory for mock executables.
 
-    Automatically includes mock pandoc with version 3.6.4 to satisfy
+    Automatically includes mock pandoc with version 3.9 to satisfy
     the version check in install-deps.sh.
 
     Args:
@@ -65,10 +65,10 @@ def mock_bin_dir(tmp_path):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
 
-    # Add mock pandoc that returns version >= 3.8.2 (required by install-deps.sh)
+    # Add mock pandoc that returns version >= 3.9 (required by install-deps.sh)
     pandoc_script = """#!/bin/bash
 if [ "$1" = "--version" ]; then
-    echo "pandoc 3.8.2.1"
+    echo "pandoc 3.9"
     echo "Features: +server +lua"
     exit 0
 fi
@@ -79,12 +79,12 @@ exit 0
     pandoc_path.write_text(pandoc_script)
     pandoc_path.chmod(0o755)
 
-    # Add mock apt-cache that returns pandoc version >= 3.8.2
+    # Add mock apt-cache that returns pandoc version >= 3.9
     # (used by check_pandoc_pkg_version to check BEFORE installing)
     apt_cache_script = """#!/bin/bash
 if [ "$1" = "show" ] && [ "$2" = "pandoc" ]; then
     echo "Package: pandoc"
-    echo "Version: 3.8.2.1-1"
+    echo "Version: 3.9-1"
     echo "Description: general markup converter"
     exit 0
 fi
@@ -171,13 +171,13 @@ exit {exit_code}
     return create_mock_command(bin_dir, manager_name, script, exit_code)
 
 
-def create_mock_pandoc(bin_dir: Path, version: str = "3.8.2.1"):
+def create_mock_pandoc(bin_dir: Path, version: str = "3.9"):
     """
     Create a mock pandoc that returns a specific version.
 
     Args:
         bin_dir: Directory to create executable in.
-        version: Version string to return (default: 3.8.2.1).
+        version: Version string to return (default: 3.9).
 
     Returns:
         Path: Path to created mock executable.
@@ -1295,15 +1295,15 @@ class TestErrorHandling:
 
 
 class TestPandocVersionBump:
-    """Test Pandoc version bump from 3.8.1 to 3.8.2.1."""
+    """Test Pandoc version bump to 3.9."""
 
-    def test_pandoc_binary_version_is_at_least_3_8_2_1(self):
+    def test_pandoc_binary_version_is_at_least_3_9(self):
         """
-        Test that install_pandoc_binary() version is at least 3.8.2.1.
+        Test that install_pandoc_binary() version is at least 3.9.
 
         Given: scripts/install-deps.sh exists with install_pandoc_binary() function
         When: Searching for version declaration in the function
-        Then: Version string is >= 3.8.2.1
+        Then: Version string is >= 3.9
         """
         import re
 
@@ -1321,24 +1321,24 @@ class TestPandocVersionBump:
         version_str = match.group(1)
         version_parts = [int(x) for x in version_str.split(".")]
 
-        # Pad to 4 components for comparison (3.8.2.1 format)
+        # Pad to 4 components for comparison (3.9.0.0 format)
         while len(version_parts) < 4:
             version_parts.append(0)
 
-        # Expected minimum: 3.8.2.1
-        expected_min = [3, 8, 2, 1]
+        # Expected minimum: 3.9.0.0
+        expected_min = [3, 9, 0, 0]
 
         assert version_parts >= expected_min, (
-            f"Pandoc binary version {version_str} is less than 3.8.2.1"
+            f"Pandoc binary version {version_str} is less than 3.9"
         )
 
-    def test_pandoc_pkg_version_check_requires_3_8_2(self):
+    def test_pandoc_pkg_version_check_requires_3_9_0(self):
         """
-        Test that check_pandoc_pkg_version call requires at least 3.8.2.
+        Test that check_pandoc_pkg_version call requires at least 3.9.0.
 
         Given: scripts/install-deps.sh contains check_pandoc_pkg_version call
         When: Searching for the version check arguments
-        Then: Minimum version is >= 3 8 2
+        Then: Minimum version is >= 3 9 0
         """
         import re
 
@@ -1360,10 +1360,10 @@ class TestPandocVersionBump:
         patch = int(match.group(3))
 
         version_tuple = (major, minor, patch)
-        expected_min = (3, 8, 2)
+        expected_min = (3, 9, 0)
 
         assert version_tuple >= expected_min, (
-            f"check_pandoc_pkg_version requires {major}.{minor}.{patch}, expected >= 3.8.2"
+            f"check_pandoc_pkg_version requires {major}.{minor}.{patch}, expected >= 3.9.0"
         )
 
     def test_pandoc_binary_version_comment_references_issue(self):
@@ -1428,7 +1428,7 @@ Total Tests: 40
 - Idempotency: 2
 - Package Installation: 5
 - Error Handling: 3
-- Pandoc Version Bump: 3 (binary version >= 3.8.2.1, pkg check >= 3.8.2, comment references issue)
+- Pandoc Version Bump: 3 (binary version >= 3.9, pkg check >= 3.9.0, comment references issue)
 
 Coverage Areas:
 - Script existence and executability
@@ -1440,7 +1440,7 @@ Coverage Areas:
 - Idempotent behavior (safe to run multiple times)
 - Package installation (Pandoc, librsvg, python-frontmatter, mermaid-cli, chromium config)
 - Error handling (network errors, missing package manager, CI environments)
-- Pandoc version requirements (3.8.2.1 binary, 3.8.2 package manager minimum, bug fix documentation)
+- Pandoc version requirements (3.9 binary, 3.9.0 package manager minimum, bug fix documentation)
 
 Test Approach:
 - Uses subprocess to execute shell script
@@ -1451,7 +1451,4 @@ Test Approach:
 - Tests both positive and negative cases
 - Ensures proper exit codes and output (strict assertions for exit codes)
 - Static analysis tests for version strings and comments
-
-Note: TestPandocVersionBump tests are expected to FAIL initially (RED phase of TDD).
-The version bump from 3.8.1 → 3.8.2.1 will be implemented in the GREEN phase.
 """

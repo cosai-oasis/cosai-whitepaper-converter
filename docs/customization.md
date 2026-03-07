@@ -220,6 +220,30 @@ def process_markdown(input_file, engine=None, temp_dir=None):
     # ... rest of function
 ```
 
+### Built-in: HTML Comment-Wrapped Pandoc Attributes
+
+Pandoc attributes like `{width=55%}` control image sizing in PDF output, but GitHub renders them as visible text. To hide them on GitHub while preserving them for PDF conversion, wrap them in HTML comments:
+
+```markdown
+![Diagram](diagrams/example.svg)<!--{width=55%}-->
+```
+
+The converter automatically strips the `<!-- -->` wrapper, producing:
+
+```markdown
+![Diagram](diagrams/example.svg){width=55%}
+```
+
+This works for any Pandoc attribute block: `{width=...}`, `{.class}`, `{#id}`, or combinations thereof.
+
+Raw LaTeX commands are also supported:
+
+```markdown
+<!--\newpage-->
+```
+
+becomes `\newpage` in the Pandoc input, forcing a page break in the PDF without showing anything on GitHub.
+
 ## Page Layout
 
 Page dimensions in `cosai.sty`:

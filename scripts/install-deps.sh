@@ -921,8 +921,8 @@ main() {
     log_info "Installing Pandoc 3.9+..."
 
     # Check if package manager has a sufficient version BEFORE installing
-    if check_pandoc_pkg_version "$PKG_MANAGER" 3 8 2; then
-        log_info "Package manager has Pandoc >= 3.8.2, installing from package manager..."
+    if check_pandoc_pkg_version "$PKG_MANAGER" 3 9 0; then
+        log_info "Package manager has Pandoc >= 3.9, installing from package manager..."
         install_packages "$PKG_MANAGER" pandoc
     else
         log_info "Package manager Pandoc is too old or unavailable, installing from GitHub releases..."
@@ -1050,11 +1050,16 @@ main() {
         # Install Puppeteer/Playwright dependencies for headless Chrome
         case "$PKG_MANAGER" in
             apt-get)
+                # Detect correct ALSA package name (Ubuntu 24.04+ uses libasound2t64)
+                local alsa_pkg="libasound2"
+                if ! apt-cache show libasound2 >/dev/null 2>&1 && apt-cache show libasound2t64 >/dev/null 2>&1; then
+                    alsa_pkg="libasound2t64"
+                fi
                 # Core Chromium dependencies for Puppeteer/Playwright
                 install_packages "$PKG_MANAGER" \
                     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
                     libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
-                    libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 \
+                    libxdamage1 libxfixes3 libxrandr2 libgbm1 "$alsa_pkg" \
                     libpango-1.0-0 libcairo2 2>/dev/null || {
                     log_warning "Some Chromium dependencies may be missing"
                 }
