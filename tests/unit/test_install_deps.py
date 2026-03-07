@@ -1415,10 +1415,291 @@ class TestPandocVersionBump:
         )
 
 
+class TestVenvCreation:
+    """Test .venv creation logic for non-root users."""
+
+    def test_creates_venv_when_non_root_and_requirements_exist(self):
+        """
+        Test that the script contains logic to create .venv for non-root users.
+
+        Given: A non-root user (uid != 0) with requirements.txt present
+        When: Searching for venv creation logic in the script
+        Then: Script contains code that creates .venv using python3 -m venv
+        """
+        import re
+
+        content = SCRIPT_PATH.read_text()
+
+        # Script must contain a venv creation call guarded by a non-root check
+        # Look for: python3 -m venv ... .venv (in some form)
+        assert re.search(r"python3\s+-m\s+venv", content), (
+            "Script does not contain 'python3 -m venv' for venv creation"
+        )
+
+    def test_skips_venv_when_root(self):
+        """
+        Test that the script skips venv creation when running as root.
+
+        Given: A root user (uid == 0)
+        When: Searching for root guard around venv creation in the script
+        Then: Venv creation block is conditional on non-root uid
+        """
+        import re
+
+        content = SCRIPT_PATH.read_text()
+
+        # There must be a block that checks uid/EUID and conditionally creates the venv.
+        # Either: [ "$effective_uid" -ne 0 ] or [ "$EUID" != "0" ] or similar.
+        has_uid_check = bool(
+            re.search(r"effective_uid.*-ne\s+0", content)
+            or re.search(r'_TEST_EUID.*!=.*["\']0["\']', content)
+            or re.search(r'effective_uid.*!=.*["\']0["\']', content)
+        )
+        assert has_uid_check, (
+            "Script does not have a non-root uid guard for venv creation; "
+            "root users should skip the venv path"
+        )
+
+    def test_skips_venv_when_skip_venv_true(self):
+        """
+        Test that SKIP_VENV=true prevents venv creation.
+
+        Given: The SKIP_VENV environment variable is set to "true"
+        When: Searching for SKIP_VENV handling in the script
+        Then: Script contains a check for SKIP_VENV before creating the venv
+        """
+        content = SCRIPT_PATH.read_text()
+
+        assert "SKIP_VENV" in content, (
+            "Script does not reference SKIP_VENV env var; "
+            "setting SKIP_VENV=true should prevent venv creation"
+        )
+
+    def test_skips_venv_when_no_requirements_txt(self):
+        """
+        Test that venv creation is skipped when requirements.txt is absent.
+
+        Given: No requirements.txt file at PROJECT_ROOT
+        When: Searching for requirements.txt existence guard in the script
+        Then: Venv creation is conditional on requirements.txt existing
+        """
+        import re
+
+        content = SCRIPT_PATH.read_text()
+
+        # Script must check for requirements.txt existence before creating venv
+        assert re.search(
+            r'-f\s+["\']?\$[{(]?PROJECT_ROOT[)}]?/requirements\.txt', content
+        ), "Script does not check for requirements.txt before creating venv"
+
+    def test_venv_uses_clear_flag(self):
+        """
+        Test that venv creation uses --clear to handle stale venv directories.
+
+        Given: scripts/install-deps.sh with venv creation logic
+        When: Searching for the venv creation command
+        Then: Command includes --clear flag
+        """
+        import re
+
+        content = SCRIPT_PATH.read_text()
+
+        # python3 -m venv --clear ...
+        assert re.search(r"python3\s+-m\s+venv\s+--clear", content), (
+            "Script does not use '--clear' flag with python3 -m venv; "
+            "stale venvs must be cleared for repeatability"
+        )
+
+    def test_prints_activation_instructions(self):
+        """
+        Test that the script prints .venv activation instructions for non-root users.
+
+        Given: Venv creation succeeds for a non-root user
+        When: Searching for activation hint in the script
+        Then: Script contains output mentioning 'source' or 'activate' for the venv
+        """
+        import re
+
+        content = SCRIPT_PATH.read_text()
+
+        # Script should print something like: source .venv/bin/activate
+        has_activation_hint = bool(
+            re.search(r"source\s+.*\.venv.*activate", content)
+            or re.search(r"\.venv.*bin/activate", content)
+            or re.search(r"activate.*\.venv", content)
+        )
+        assert has_activation_hint, (
+            "Script does not print activation instructions after creating .venv; "
+            "non-root users need to know how to activate it"
+        )
+
+
+class TestLocalNpmInstall:
+    """Test local npm install (non-root) vs global npm install (root)."""
+
+    def test_local_npm_install_when_non_root_and_package_json_exists(self):
+        """
+        Test that the script runs 'npm install --prefix' for non-root users.
+
+        Given: A non-root user with package.json present at PROJECT_ROOT
+        When: Searching for local npm install logic in the script
+        Then: Script contains 'npm install --prefix' (local, uses lockfile)
+        """
+        import re
+
+        content = SCRIPT_PATH.read_text()
+
+        assert re.search(r"npm\s+install\s+--prefix", content), (
+            "Script does not contain 'npm install --prefix' for local installs; "
+            "non-root users should use local npm install with lockfile"
+        )
+
+    def test_global_npm_install_when_root(self):
+        """
+        Test that the script still uses 'npm install -g' for root users.
+
+        Given: scripts/install-deps.sh with npm install logic
+        When: Searching for global npm install in the script
+        Then: Script contains 'npm install -g @mermaid-js/mermaid-cli'
+        """
+        import re
+
+        content = SCRIPT_PATH.read_text()
+
+        # Global install must still be present for the root path
+        assert re.search(r"npm\s+install\s+-g\s+@mermaid-js/mermaid-cli", content), (
+            "Script does not contain 'npm install -g @mermaid-js/mermaid-cli'; "
+            "root users should still use global npm install"
+        )
+
+    def test_skips_global_npm_when_local_done(self):
+        """
+        Test that the global npm install is skipped when local npm install runs.
+
+        Given: scripts/install-deps.sh with branching npm install logic
+        When: Searching for a conditional that separates local vs global paths
+        Then: Global 'npm install -g' is in an else/elif branch that is
+              skipped when local install has already run
+        """
+        import re
+
+        content = SCRIPT_PATH.read_text()
+
+        # There must be a conditional structure: if non-root ... npm install --prefix
+        # else ... npm install -g
+        # We verify that both forms exist AND that they appear within an if/else structure
+        has_local = bool(re.search(r"npm\s+install\s+--prefix", content))
+        has_global = bool(re.search(r"npm\s+install\s+-g\s+@mermaid-js", content))
+
+        assert has_local and has_global, (
+            f"Expected both local (npm install --prefix) and global "
+            f"(npm install -g) paths. local={has_local}, global={has_global}"
+        )
+
+        # The two paths must appear in mutually exclusive branches.
+        # Simplest heuristic: local install line appears before 'else' which leads to global.
+        local_pos = content.find("npm install --prefix")
+        global_pos = content.find("npm install -g @mermaid-js")
+        assert local_pos != -1 and global_pos != -1
+
+        # Find the closest 'else' between the two positions
+        between = content[local_pos:global_pos]
+        assert "else" in between or "fi" in between, (
+            "Local npm install and global npm install do not appear to be "
+            "in mutually exclusive branches (no 'else' or 'fi' between them)"
+        )
+
+
+class TestSkipSystemInstalls:
+    """Test that system-level pip and npm installs are skipped on the non-root path."""
+
+    def test_skips_system_pip_when_venv_created(self):
+        """
+        Test that the system pip cascade is skipped when a venv was created.
+
+        Given: scripts/install-deps.sh with venv creation and pip cascade logic
+        When: Searching for a guard that skips system pip when venv is active
+        Then: The system pip cascade block is conditional on venv NOT being created
+        """
+        import re
+
+        content = SCRIPT_PATH.read_text()
+
+        # There must be a flag or condition that skips the pip cascade when
+        # venv_created=true (or similar variable)
+        has_venv_flag = bool(
+            re.search(r"venv_created\s*=", content)
+            or re.search(r"venv_created", content)
+        )
+        assert has_venv_flag, (
+            "Script does not use a 'venv_created' flag (or equivalent) to skip "
+            "the system pip cascade when a venv was created"
+        )
+
+    def test_system_pip_runs_when_root(self):
+        """
+        Test that the system pip cascade still runs for root users.
+
+        Given: scripts/install-deps.sh with pip install cascade
+        When: Searching for pip install python-frontmatter in script
+        Then: pip cascade block (pip install, pip3, --user, --break-system-packages)
+              is still present in the script for the root code path
+        """
+        content = SCRIPT_PATH.read_text()
+
+        # The root path must still attempt to install python-frontmatter via pip
+        assert "python-frontmatter" in content, (
+            "Script no longer contains any pip install of python-frontmatter; "
+            "root users need the system pip cascade"
+        )
+
+        # Must still have the pip cascade variants
+        assert "--break-system-packages" in content, (
+            "Script lost '--break-system-packages' pip fallback; "
+            "required for root on newer Debian/Ubuntu"
+        )
+
+
+class TestPython3VenvPackage:
+    """Test that the apt fallback path includes python3-venv."""
+
+    def test_apt_fallback_includes_python3_venv(self):
+        """
+        Test that the apt-get fallback install list contains python3-venv.
+
+        Given: scripts/install-deps.sh with an apt-get fallback for python3
+        When: Searching for the fallback install_packages call
+        Then: 'python3-venv' appears alongside python3 and python3-pip
+              in at least one apt-get install invocation
+        """
+        import re
+
+        content = SCRIPT_PATH.read_text()
+
+        # Look for an install_packages (or apt-get install) call that includes python3-venv
+        has_python3_venv = bool(re.search(r"python3-venv", content))
+        assert has_python3_venv, (
+            "Script does not install 'python3-venv' via apt-get; "
+            "required for 'python3 -m venv' to work on Debian/Ubuntu"
+        )
+
+        # Specifically it must appear in an apt-get context (not just a comment)
+        # Find the line(s) containing python3-venv and check they're not only comments
+        lines_with_venv = [
+            line.strip() for line in content.splitlines() if "python3-venv" in line
+        ]
+        non_comment_lines = [
+            line for line in lines_with_venv if not line.startswith("#")
+        ]
+        assert non_comment_lines, (
+            "'python3-venv' only appears in comments, not in an actual install command"
+        )
+
+
 """
 Test Summary
 ============
-Total Tests: 40
+Total Tests: 53
 - Script Existence: 2
 - Architecture Detection: 2 (x86_64, ARM64)
 - Platform Detection: 6
@@ -1429,18 +1710,26 @@ Total Tests: 40
 - Package Installation: 5
 - Error Handling: 3
 - Pandoc Version Bump: 3 (binary version >= 3.9, pkg check >= 3.9.0, comment references issue)
+- Venv Creation: 6 (non-root creates venv, root skips, SKIP_VENV=true, no requirements.txt, --clear flag, activation hint)
+- Local npm Install: 3 (local for non-root, global for root, mutual exclusion)
+- Skip System Installs: 2 (pip cascade skipped when venv created, still runs for root)
+- python3-venv package: 1 (apt fallback includes python3-venv)
 
 Coverage Areas:
 - Script existence and executability
 - Architecture detection (x86_64/amd64, ARM64/aarch64) for binary downloads
 - Platform detection (Debian/Ubuntu, Alpine, macOS, RHEL/Fedora, Windows)
-- Skip flag handling (SKIP_PYTHON, SKIP_NODE, SKIP_CHROMIUM)
+- Skip flag handling (SKIP_PYTHON, SKIP_NODE, SKIP_CHROMIUM, SKIP_VENV)
 - LaTeX engine selection (LATEX_ENGINE env var: tectonic, pdflatex, xelatex, lualatex, invalid defaults to tectonic with warning)
 - Exit code behavior (0=success, 1=general error, 2=Windows, 3=no sudo, 4=network, 5=verify failed)
 - Idempotent behavior (safe to run multiple times)
 - Package installation (Pandoc, librsvg, python-frontmatter, mermaid-cli, chromium config)
 - Error handling (network errors, missing package manager, CI environments)
 - Pandoc version requirements (3.9 binary, 3.9.0 package manager minimum, bug fix documentation)
+- Venv creation (PROJECT_ROOT/.venv, --clear, pip install -r requirements.txt, activation instructions)
+- Root vs non-root split for npm (local --prefix for non-root, -g for root)
+- System pip cascade skip when venv handles python-frontmatter install
+- python3-venv in apt fallback so 'python3 -m venv' works on Debian/Ubuntu
 
 Test Approach:
 - Uses subprocess to execute shell script
@@ -1450,5 +1739,5 @@ Test Approach:
 - Mocks verify-deps.sh for post-install verification
 - Tests both positive and negative cases
 - Ensures proper exit codes and output (strict assertions for exit codes)
-- Static analysis tests for version strings and comments
+- Static analysis tests for version strings, flags, and structural patterns
 """

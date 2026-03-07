@@ -64,6 +64,8 @@ jobs:
           python-version: '3.12'
 
       - name: Install Python dependencies
+        # install-deps.sh only installs python-frontmatter for root users (no venv).
+        # Full requirements.txt (pytest, ruff, etc.) must be installed separately in CI.
         run: pip install -r requirements.txt
 
       - name: Test conversion

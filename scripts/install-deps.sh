@@ -856,6 +856,14 @@ main() {
     local script_path="${BASH_SOURCE[0]}"
     SCRIPT_DIR="$(cd "${script_path%/*}" && pwd)"
 
+    # Derive project root from script directory
+    local project_root
+    project_root="$(cd "$SCRIPT_DIR/.." && pwd)"
+    PROJECT_ROOT="$project_root"
+
+    # Determine effective UID (allow override for testing)
+    local effective_uid="${_TEST_EUID:-${EUID:-$(id -u)}}"
+
     # Track critical installation failures
     local install_failures=0
 
@@ -875,19 +883,19 @@ main() {
                 # Install Python 3.12+ (standard python3 may be too old on some distros)
                 install_python312_apt || {
                     log_warning "Falling back to system python3"
-                    install_packages "$PKG_MANAGER" python3 python3-pip
+                    install_packages "$PKG_MANAGER" python3 python3-pip python3-venv
                 }
                 # Ensure pip is installed
                 install_packages "$PKG_MANAGER" python3-pip 2>/dev/null || true
                 ;;
             apk)
-                install_packages "$PKG_MANAGER" python3 py3-pip
+                install_packages "$PKG_MANAGER" python3 py3-pip py3-virtualenv
                 ;;
             brew)
                 install_packages "$PKG_MANAGER" python@3.12
                 ;;
             dnf)
-                install_packages "$PKG_MANAGER" python3 python3-pip
+                install_packages "$PKG_MANAGER" python3 python3-pip python3-virtualenv
                 ;;
         esac
     fi
@@ -978,62 +986,17 @@ main() {
         exit 1
     fi
 
-    # Install python-frontmatter (unless Python is skipped)
-    if [ "${SKIP_PYTHON:-false}" != "true" ]; then
-        log_info "Installing python-frontmatter via pip..."
-        local installed=false
-
-        # Use python3 (what tests/users will actually call) - requirement is 3.12+
-        # Only fall back to specific version if python3 doesn't exist
-        local python_exe=""
-        if command -v python3 >/dev/null 2>&1; then
-            python_exe="python3"
-        elif [ -x /usr/local/bin/python3.12 ]; then
-            python_exe="/usr/local/bin/python3.12"
-        elif command -v python3.12 >/dev/null 2>&1; then
-            python_exe="python3.12"
-        fi
-
-        if [ -n "$python_exe" ]; then
-            # Ensure pip is available for this Python
-            $python_exe -m ensurepip --upgrade 2>/dev/null || true
-
-            # Try to install python-frontmatter
-            if $python_exe -m pip install python-frontmatter 2>/dev/null; then
-                installed=true
-                log_success "python-frontmatter installed"
-            elif $python_exe -m pip install --user python-frontmatter 2>/dev/null; then
-                installed=true
-                log_success "python-frontmatter installed (user)"
-            elif $python_exe -m pip install --break-system-packages python-frontmatter 2>/dev/null; then
-                installed=true
-                log_success "python-frontmatter installed (break-system-packages)"
-            fi
-        fi
-
-        # Fallback to pip3 if python executable method failed
-        if [ "$installed" = "false" ] && command -v pip3 >/dev/null 2>&1; then
-            if pip3 install python-frontmatter 2>/dev/null; then
-                installed=true
-                log_success "python-frontmatter installed (pip3)"
-            elif pip3 install --user python-frontmatter 2>/dev/null; then
-                installed=true
-                log_success "python-frontmatter installed (pip3 --user)"
-            elif pip3 install --break-system-packages python-frontmatter 2>/dev/null; then
-                installed=true
-                log_success "python-frontmatter installed (pip3 --break-system-packages)"
-            fi
-        fi
-
-        if [ "$installed" = "false" ]; then
-            log_warning "Failed to install python-frontmatter via pip"
-        fi
-    fi
-
     # Install @mermaid-js/mermaid-cli (unless Node is skipped)
+    # Non-root with package.json: local npm install (uses lockfile for pinned versions)
+    # Root or no package.json: global npm install -g (feature/CI path)
     if [ "${SKIP_NODE:-false}" != "true" ]; then
-        log_info "Installing @mermaid-js/mermaid-cli via npm..."
-        if command -v npm >/dev/null 2>&1; then
+        if [ "$effective_uid" -ne 0 ] && [ -f "$PROJECT_ROOT/package.json" ]; then
+            log_info "Installing Node.js dependencies locally..."
+            npm install --prefix "$PROJECT_ROOT" || {
+                log_warning "Failed to install Node.js dependencies locally"
+            }
+        elif command -v npm >/dev/null 2>&1; then
+            log_info "Installing @mermaid-js/mermaid-cli via npm..."
             $SUDO npm install -g @mermaid-js/mermaid-cli || {
                 log_warning "Failed to install @mermaid-js/mermaid-cli via npm"
             }
@@ -1087,6 +1050,78 @@ main() {
             }
         else
             log_warning "configure-chromium.sh not found at $SCRIPT_DIR/configure-chromium.sh"
+        fi
+    fi
+
+    # Create Python virtual environment and install dependencies (non-root only)
+    local venv_created=false
+    if [ "${SKIP_PYTHON:-false}" != "true" ] && [ "${SKIP_VENV:-false}" != "true" ] \
+        && [ "$effective_uid" -ne 0 ] && [ -f "$PROJECT_ROOT/requirements.txt" ]; then
+        log_info "Creating Python virtual environment..."
+        if python3 -m venv --clear "$PROJECT_ROOT/.venv"; then
+            if "$PROJECT_ROOT/.venv/bin/pip" install -r "$PROJECT_ROOT/requirements.txt"; then
+                venv_created=true
+                log_success "Python virtual environment created at $PROJECT_ROOT/.venv"
+                log_info "Activate with: source $PROJECT_ROOT/.venv/bin/activate"
+            else
+                log_warning "Failed to install Python dependencies into .venv"
+                rm -rf "$PROJECT_ROOT/.venv"
+            fi
+        else
+            log_warning "Failed to create Python virtual environment"
+            log_warning "Falling back to system pip (only python-frontmatter, not full requirements.txt)"
+        fi
+    fi
+
+    # Install python-frontmatter (unless Python is skipped or venv already handled it)
+    if [ "${SKIP_PYTHON:-false}" != "true" ] && [ "$venv_created" = "false" ]; then
+        log_info "Installing python-frontmatter via pip..."
+        local installed=false
+
+        # Use python3 (what tests/users will actually call) - requirement is 3.12+
+        # Only fall back to specific version if python3 doesn't exist
+        local python_exe=""
+        if command -v python3 >/dev/null 2>&1; then
+            python_exe="python3"
+        elif [ -x /usr/local/bin/python3.12 ]; then
+            python_exe="/usr/local/bin/python3.12"
+        elif command -v python3.12 >/dev/null 2>&1; then
+            python_exe="python3.12"
+        fi
+
+        if [ -n "$python_exe" ]; then
+            # Ensure pip is available for this Python
+            $python_exe -m ensurepip --upgrade 2>/dev/null || true
+
+            # Try to install python-frontmatter
+            if $python_exe -m pip install python-frontmatter 2>/dev/null; then
+                installed=true
+                log_success "python-frontmatter installed"
+            elif $python_exe -m pip install --user python-frontmatter 2>/dev/null; then
+                installed=true
+                log_success "python-frontmatter installed (user)"
+            elif $python_exe -m pip install --break-system-packages python-frontmatter 2>/dev/null; then
+                installed=true
+                log_success "python-frontmatter installed (break-system-packages)"
+            fi
+        fi
+
+        # Fallback to pip3 if python executable method failed
+        if [ "$installed" = "false" ] && command -v pip3 >/dev/null 2>&1; then
+            if pip3 install python-frontmatter 2>/dev/null; then
+                installed=true
+                log_success "python-frontmatter installed (pip3)"
+            elif pip3 install --user python-frontmatter 2>/dev/null; then
+                installed=true
+                log_success "python-frontmatter installed (pip3 --user)"
+            elif pip3 install --break-system-packages python-frontmatter 2>/dev/null; then
+                installed=true
+                log_success "python-frontmatter installed (pip3 --break-system-packages)"
+            fi
+        fi
+
+        if [ "$installed" = "false" ]; then
+            log_warning "Failed to install python-frontmatter via pip"
         fi
     fi
 

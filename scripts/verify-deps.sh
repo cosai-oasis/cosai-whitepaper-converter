@@ -5,6 +5,12 @@
 # Track failures (don't exit early - check everything)
 FAILURES=0
 
+# Determine project root (script lives at scripts/verify-deps.sh)
+# Use bash parameter expansion instead of dirname for portability
+_verify_script_path="${BASH_SOURCE[0]}"
+_verify_script_dir="$(cd "${_verify_script_path%/*}" && pwd)"
+VERIFY_PROJECT_ROOT="$(cd "$_verify_script_dir/.." 2>/dev/null && pwd)" || VERIFY_PROJECT_ROOT=""
+
 # Helper function to extract version number from string
 # Usage: extract_version "Python 3.14.0" -> "3.14.0"
 #        extract_version "pandoc 3.8.2.1" -> "3.8.2.1"
@@ -280,13 +286,15 @@ fi
 
 # Check python-frontmatter package
 # Honor SKIP_PYTHON environment variable
+# Check .venv first (non-root installs use venv), then fall back to system pip
 if [ "${SKIP_PYTHON:-false}" = "true" ]; then
     echo "[~] python-frontmatter check skipped (SKIP_PYTHON=true)"
 else
-    # Try multiple methods to find pip
-    # Prefer python3 since that's what tests/users will call (requirement is 3.12+)
+    # Try venv pip first, then system pip
     pip_cmd=""
-    if command -v python3 &> /dev/null; then
+    if [ -n "$VERIFY_PROJECT_ROOT" ] && [ -x "$VERIFY_PROJECT_ROOT/.venv/bin/pip" ]; then
+        pip_cmd="$VERIFY_PROJECT_ROOT/.venv/bin/pip"
+    elif command -v python3 &> /dev/null; then
         pip_cmd="python3 -m pip"
     elif [ -x /usr/local/bin/python3.12 ]; then
         pip_cmd="/usr/local/bin/python3.12 -m pip"
@@ -347,29 +355,46 @@ else
     FAILURES=$((FAILURES + 1))
 fi
 
-# Check mermaid-cli (via npx)
+# Check mermaid-cli (local node_modules or global install)
+# Does NOT auto-download — verify-deps.sh must be idempotent and non-modifying
+# NOTE: convert.py invokes mermaid-cli via 'npx -y @mermaid-js/mermaid-cli', which
+# finds local node_modules/.bin/mmdc automatically if present (npx resolution order)
 # Honor SKIP_NODE environment variable (mermaid-cli requires Node.js)
 if [ "${SKIP_NODE:-false}" = "true" ]; then
     echo "[~] mermaid-cli check skipped (SKIP_NODE=true)"
 else
-    if command -v npx &> /dev/null; then
-        # Try to check if mermaid-cli is available
-        # Use mmdc --version or similar to verify
-        mermaid_check=$(npx --yes @mermaid-js/mermaid-cli --version 2>&1)
+    mermaid_found=false
+
+    # Check local node_modules first (from npm install in project root)
+    if [ -n "$VERIFY_PROJECT_ROOT" ] && [ -x "$VERIFY_PROJECT_ROOT/node_modules/.bin/mmdc" ]; then
+        mermaid_check=$("$VERIFY_PROJECT_ROOT/node_modules/.bin/mmdc" --version 2>&1)
         if [ $? -eq 0 ]; then
-            # Extract version if present
             mermaid_ver=$(extract_version "$mermaid_check")
             if [ -n "$mermaid_ver" ]; then
                 echo "[✓] mermaid-cli $mermaid_ver"
             else
                 echo "[✓] mermaid-cli available"
             fi
-        else
-            echo "[✗] mermaid-cli not available via npx"
-            FAILURES=$((FAILURES + 1))
+            mermaid_found=true
         fi
-    else
-        echo "[✗] npx not found (cannot verify mermaid-cli)"
+    fi
+
+    # Check global install
+    if [ "$mermaid_found" = "false" ] && command -v mmdc &> /dev/null; then
+        mermaid_check=$(mmdc --version 2>&1)
+        if [ $? -eq 0 ]; then
+            mermaid_ver=$(extract_version "$mermaid_check")
+            if [ -n "$mermaid_ver" ]; then
+                echo "[✓] mermaid-cli $mermaid_ver"
+            else
+                echo "[✓] mermaid-cli available"
+            fi
+            mermaid_found=true
+        fi
+    fi
+
+    if [ "$mermaid_found" = "false" ]; then
+        echo "[✗] mermaid-cli not found (install via 'npm install' or 'npm install -g @mermaid-js/mermaid-cli')"
         FAILURES=$((FAILURES + 1))
     fi
 fi

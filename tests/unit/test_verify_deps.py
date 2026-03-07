@@ -560,13 +560,8 @@ class TestOutputFormat:
             mock_bin_dir, "rsvg-convert", "rsvg-convert version 2.54.5", 0
         )
 
-        # Mock npx for mermaid-cli
-        npx_script = mock_bin_dir / "npx"
-        npx_script.write_text("""#!/bin/bash
-echo "0.10.3"
-exit 0
-""")
-        npx_script.chmod(0o755)
+        # Mock mmdc (mermaid-cli) — verify-deps.sh checks for mmdc directly
+        create_mock_command(mock_bin_dir, "mmdc", "0.10.3", 0)
 
         # Mock chromium check
         scripts_dir = tmp_path / "scripts"
@@ -674,13 +669,8 @@ class TestExitCodes:
             mock_bin_dir, "rsvg-convert", "rsvg-convert version 2.54.5", 0
         )
 
-        # Mock npx for mermaid-cli
-        npx_script = mock_bin_dir / "npx"
-        npx_script.write_text("""#!/bin/bash
-echo "0.10.3"
-exit 0
-""")
-        npx_script.chmod(0o755)
+        # Mock mmdc (mermaid-cli) — verify-deps.sh checks for mmdc directly
+        create_mock_command(mock_bin_dir, "mmdc", "0.10.3", 0)
 
         # Mock configure-chromium.sh --check to return success
         scripts_dir = tmp_path / "scripts"
@@ -1017,6 +1007,26 @@ Summary: Parse and manage posts with YAML frontmatter
         assert result.returncode == 1
         assert "[✗]" in result.stdout
 
+    def test_checks_venv_pip_before_system_pip(self):
+        """
+        Test that verify-deps.sh checks .venv/bin/pip before system pip.
+
+        Given: verify-deps.sh with venv-aware python-frontmatter check
+        When: Reading the script source
+        Then: .venv/bin/pip check appears before system pip fallback
+        """
+        script_path = Path(__file__).resolve().parents[2] / "scripts" / "verify-deps.sh"
+        content = script_path.read_text()
+
+        venv_pos = content.find(".venv/bin/pip")
+        system_pos = content.find("python3 -m pip")
+
+        assert venv_pos != -1, "verify-deps.sh does not check .venv/bin/pip"
+        assert system_pos != -1, "verify-deps.sh does not check system python3 -m pip"
+        assert venv_pos < system_pos, (
+            ".venv/bin/pip check should appear before system pip check"
+        )
+
 
 class TestRsvgConvertVerification:
     """Test verification of rsvg-convert (from librsvg2-bin)."""
@@ -1067,7 +1077,7 @@ class TestRsvgConvertVerification:
 
 
 class TestMermaidCliVerification:
-    """Test verification of mermaid-cli (via npx)."""
+    """Test verification of mermaid-cli (via local/global mmdc)."""
 
     def test_checks_mermaid_cli_available(self, mock_env, mock_bin_dir):
         """
@@ -1082,22 +1092,14 @@ class TestMermaidCliVerification:
         create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.9", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
-        # Mock npx that can run mermaid-cli
-        npx_script = mock_bin_dir / "npx"
-        npx_script.write_text("""#!/bin/bash
-if [[ "$*" == *"mmdc"* ]] || [[ "$*" == *"mermaid"* ]]; then
-    echo "0.10.3"
-    exit 0
-fi
-echo "Command not found"
-exit 1
-""")
-        npx_script.chmod(0o755)
+        # Mock mmdc (mermaid-cli) — verify-deps.sh checks for mmdc directly
+        create_mock_command(mock_bin_dir, "mmdc", "0.10.3", 0)
 
         mock_env["PATH"] = str(mock_bin_dir)
         result = run_verify_deps(env=mock_env)
 
-        assert "mermaid" in result.stdout.lower() or "mmdc" in result.stdout.lower()
+        assert "[✓]" in result.stdout
+        assert "mermaid" in result.stdout.lower()
 
     def test_detects_mermaid_cli_missing(self, mock_env, mock_bin_dir):
         """
@@ -1113,19 +1115,13 @@ exit 1
         create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.9", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
-        # Mock npx that fails for mermaid-cli
-        npx_script = mock_bin_dir / "npx"
-        npx_script.write_text("""#!/bin/bash
-echo "npx: command not found: mmdc"
-exit 1
-""")
-        npx_script.chmod(0o755)
-
+        # No mmdc in PATH — mermaid-cli not installed
         mock_env["PATH"] = str(mock_bin_dir)
         result = run_verify_deps(env=mock_env)
 
         assert result.returncode == 1
         assert "[✗]" in result.stdout
+        assert "mermaid" in result.stdout.lower()
 
 
 class TestMalformedConfig:
