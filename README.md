@@ -34,7 +34,7 @@ options:
 
 - **Python**: 3.12 or higher
 - **Pandoc**: 3.9 or higher
-- **Node.js**: 18 or higher (for Mermaid CLI)
+- **Node.js**: 20 or higher (for Mermaid CLI)
 - **LaTeX engine**: One of: tectonic (default), pdflatex, xelatex, or lualatex
 
 ## Installation Options
@@ -154,7 +154,7 @@ Testing several markdown files has revealed a few best practices or things to no
 - **`\newline` errors**: Often caused by errant `<br>` tags in unexpected places. Check your Markdown source.
 
 ### Mermaid rendering issues
-- Ensure Node.js 18+ is installed
+- Ensure Node.js 20+ is installed
 - Check that `npx` is available in your PATH
 - Mermaid CLI is run via `npx -y @mermaid-js/mermaid-cli`
 

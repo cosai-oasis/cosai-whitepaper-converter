@@ -4,7 +4,7 @@ Tests for scripts/verify-deps.sh - dependency verification script.
 This module tests the dependency verification script that validates all required
 project dependencies are installed with correct versions:
 - Python 3.12+
-- Node.js 18+
+- Node.js 20+
 - Pandoc 3.9+
 - LaTeX engine (tectonic/pdflatex/xelatex/lualatex based on config)
 - Chromium (via configure-chromium.sh)
@@ -332,36 +332,41 @@ class TestVersionValidation:
         assert "[✗]" in result.stdout
         assert "2.7" in result.stdout
 
-    def test_nodejs_version_18_passes(self, mock_env, mock_bin_dir):
+    def test_nodejs_version_18_fails(self, mock_env, mock_bin_dir):
         """
-        Test that Node.js 18.x passes version validation.
+        Test that Node.js 18.x fails version validation.
 
-        Given: Node.js v18.0.0 installed
+        Given: Node.js v18.0.0 installed (below minimum 20)
         When: verify-deps.sh is executed
-        Then: Node.js check shows [✓]
-              Output shows "requires 18+"
+        Then: Node.js check shows [✗]
+              Output shows "version too low" and "requires 20+"
+              Exit code is 1
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
         create_mock_command(mock_bin_dir, "node", "v18.0.0", 0)
-        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.9", 0)
-        create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
         mock_env["PATH"] = str(mock_bin_dir)
         result = run_verify_deps(env=mock_env)
 
-        assert "Node" in result.stdout and "18" in result.stdout
-        assert "requires 18+" in result.stdout
+        assert result.returncode == 1
+        assert "[✗]" in result.stdout
+        assert "18" in result.stdout
+        assert (
+            "version too low" in result.stdout.lower()
+            or "requires 20+" in result.stdout
+        )
 
     def test_nodejs_version_20_passes(self, mock_env, mock_bin_dir):
         """
         Test that Node.js 20.x passes version validation.
 
-        Given: Node.js v20.10.0 installed
+        Given: Node.js v20.0.0 installed (minimum required version)
         When: verify-deps.sh is executed
         Then: Node.js check shows [✓]
+              Output shows "requires 20+"
         """
         create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
-        create_mock_command(mock_bin_dir, "node", "v20.10.0", 0)
+        create_mock_command(mock_bin_dir, "node", "v20.0.0", 0)
         create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.9", 0)
         create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
 
@@ -369,12 +374,33 @@ class TestVersionValidation:
         result = run_verify_deps(env=mock_env)
 
         assert "Node" in result.stdout and "20" in result.stdout
+        assert "requires 20+" in result.stdout
+
+    def test_nodejs_version_24_passes(self, mock_env, mock_bin_dir):
+        """
+        Test that Node.js 24.x passes version validation.
+
+        Given: Node.js v24.0.0 installed (above minimum 20)
+        When: verify-deps.sh is executed
+        Then: Node.js check shows [✓]
+              Output shows "requires 20+"
+        """
+        create_mock_command(mock_bin_dir, "python3", "Python 3.14.0", 0)
+        create_mock_command(mock_bin_dir, "node", "v24.0.0", 0)
+        create_mock_command(mock_bin_dir, "pandoc", "pandoc 3.9", 0)
+        create_mock_command(mock_bin_dir, "tectonic", "0.15.0", 0)
+
+        mock_env["PATH"] = str(mock_bin_dir)
+        result = run_verify_deps(env=mock_env)
+
+        assert "Node" in result.stdout and "24" in result.stdout
+        assert "requires 20+" in result.stdout
 
     def test_nodejs_version_16_fails(self, mock_env, mock_bin_dir):
         """
         Test that Node.js 16.x fails version validation.
 
-        Given: Node.js v16.0.0 installed (below minimum 18)
+        Given: Node.js v16.0.0 installed (below minimum 20)
         When: verify-deps.sh is executed
         Then: Output shows [✗] for Node.js
               Output indicates version too low
@@ -391,7 +417,7 @@ class TestVersionValidation:
         assert "16" in result.stdout
         assert (
             "version too low" in result.stdout.lower()
-            or "requires 18+" in result.stdout
+            or "requires 20+" in result.stdout
         )
 
     def test_pandoc_version_39_passes(self, mock_env, mock_bin_dir):
@@ -641,7 +667,7 @@ class TestOutputFormat:
 
         # Check for requirement strings
         assert "requires 3.12+" in result.stdout, "Python requirement should appear"
-        assert "requires 18+" in result.stdout, "Node.js requirement should appear"
+        assert "requires 20+" in result.stdout, "Node.js requirement should appear"
         assert "requires 3.9+" in result.stdout, "Pandoc requirement should appear"
 
 
@@ -1176,7 +1202,7 @@ Total Tests: 42
 Coverage Areas:
 - Script existence and executability
 - Missing dependency detection (Python, Node.js, Pandoc, LaTeX engines, rsvg-convert)
-- Version validation (minimum versions: Python 3.12+, Node.js 18+, Pandoc 3.9+)
+- Version validation (minimum versions: Python 3.12+, Node.js 20+, Pandoc 3.9+)
 - Output formatting ([✓] success markers, [✗] failure markers, version numbers)
 - Exit code behavior (0 for success, 1 for any failures)
 - LaTeX engine detection (env var, config file, default to tectonic)

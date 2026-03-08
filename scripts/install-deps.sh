@@ -735,21 +735,21 @@ install_python312_apt() {
     return 1
 }
 
-# Install Node.js 18+ on apt-get systems via NodeSource
-install_nodejs18_apt() {
-    # Check if node 18+ is already available
+# Install Node.js 20+ on apt-get systems via NodeSource
+install_nodejs_apt() {
+    # Check if node 20+ is already available
     if command -v node >/dev/null 2>&1; then
         local ver
         ver=$(node --version 2>/dev/null | sed 's/^v//' || echo "0.0.0")
         local major="${ver%%.*}"
-        if [ "$major" -ge 18 ] 2>/dev/null; then
+        if [ "$major" -ge 20 ] 2>/dev/null; then
             log_success "Node.js $ver already meets requirements"
             return 0
         fi
     fi
 
-    # Install via NodeSource (Node.js 22 LTS)
-    log_info "Setting up NodeSource repository for Node.js 22..."
+    # Install via NodeSource (Node.js 24 LTS)
+    log_info "Setting up NodeSource repository for Node.js 24..."
 
     # NodeSource setup requires curl
     if ! command -v curl >/dev/null 2>&1; then
@@ -763,7 +763,7 @@ install_nodejs18_apt() {
     # (Using temp file to avoid pipe issues with SUDO expansion)
     local tmp_setup
     tmp_setup=$(mktemp)
-    if curl -fsSL https://deb.nodesource.com/setup_22.x -o "$tmp_setup" 2>/dev/null; then
+    if curl -fsSL https://deb.nodesource.com/setup_24.x -o "$tmp_setup" 2>/dev/null; then
         if [ -n "$SUDO" ]; then
             $SUDO -E bash "$tmp_setup" >/dev/null 2>&1 || {
                 rm -f "$tmp_setup"
@@ -796,7 +796,7 @@ install_nodejs18_apt() {
         log_warning "Failed to download NodeSource setup script"
     fi
 
-    log_error "Failed to install Node.js 18+"
+    log_error "Failed to install Node.js 20+"
     return 1
 }
 
@@ -900,15 +900,15 @@ main() {
         esac
     fi
 
-    # Install Node.js 18+ (unless skipped)
+    # Install Node.js 20+ (unless skipped)
     if [ "${SKIP_NODE:-false}" = "true" ]; then
         log_info "Skipping Node.js installation"
     else
-        log_info "Installing Node.js 18+..."
+        log_info "Installing Node.js 20+..."
         case "$PKG_MANAGER" in
             apt-get)
-                # Use NodeSource to get Node.js 18+ (system packages are too old)
-                install_nodejs18_apt || {
+                # Use NodeSource to get Node.js 20+ (system packages are too old)
+                install_nodejs_apt || {
                     log_warning "Falling back to system nodejs"
                     install_packages "$PKG_MANAGER" nodejs npm
                 }

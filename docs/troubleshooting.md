@@ -72,7 +72,7 @@ sudo apt install texlive-fonts-extra
 **Solutions**:
 1. Verify Node.js is installed:
    ```bash
-   node --version  # Should be 18+
+   node --version  # Should be 20+
    ```
 2. Verify npx is available:
    ```bash

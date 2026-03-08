@@ -4,8 +4,8 @@ Tests for scripts/install-deps.sh - dependency installation script.
 This module tests the dependency installation script that installs all required
 project dependencies on various platforms:
 - Python 3.12+ (unless SKIP_PYTHON=true)
-- Node.js 18+ (unless SKIP_NODE=true)
-- Pandoc 3.0+
+- Node.js 20+ (unless SKIP_NODE=true)
+- Pandoc 3.9+
 - LaTeX engine (tectonic/pdflatex/xelatex/lualatex based on LATEX_ENGINE env var)
 - Chromium configuration (via configure-chromium.sh, unless SKIP_CHROMIUM=true)
 - python-frontmatter Python package

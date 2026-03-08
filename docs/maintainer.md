@@ -162,7 +162,7 @@ Environment variables for `scripts/install-deps.sh`:
 |----------|---------|---------|
 | `LATEX_ENGINE` | `tectonic` | LaTeX engine: `tectonic`, `pdflatex`, `xelatex`, `lualatex` |
 | `SKIP_PYTHON` | `false` | Skip Python 3.12 installation |
-| `SKIP_NODE` | `false` | Skip Node.js 22 LTS installation |
+| `SKIP_NODE` | `false` | Skip Node.js 24 LTS installation |
 | `SKIP_CHROMIUM` | `false` | Skip Chromium configuration |
 | `_TEST_EUID` | *(unset)* | Override `EUID` for testing `check_sudo()` in root containers |
 
@@ -173,7 +173,7 @@ Versions actually installed by `scripts/install-deps.sh`:
 | Dependency | Installed Version | Minimum Enforced | Enforced By |
 |------------|-------------------|------------------|-------------|
 | Python | 3.12.x | 3.12+ | `verify-deps.sh` |
-| Node.js | 22 LTS (via NodeSource `setup_22.x`) | 18+ | `verify-deps.sh` |
+| Node.js | 24 LTS (via NodeSource `setup_24.x`) | 20+ | `verify-deps.sh` |
 | Pandoc | 3.9 (from GitHub releases) | 3.9+ | `verify-deps.sh` |
 | Tectonic | 0.15.0 (from GitHub releases) | any | `verify-deps.sh` (presence only) |
 | Mermaid CLI | ^11.12.0 (`package.json`) | any | `verify-deps.sh` (presence only) |

@@ -112,7 +112,7 @@ else
     fi
 fi
 
-# Check Node.js 18+
+# Check Node.js 20+
 # Honor SKIP_NODE environment variable
 if [ "${SKIP_NODE:-false}" = "true" ]; then
     echo "[~] Node.js check skipped (SKIP_NODE=true)"
@@ -123,10 +123,10 @@ else
             # Extract version from "v20.10.0" format
             node_ver=$(extract_version "$node_version")
             if [ -n "$node_ver" ]; then
-                if version_ge "$node_ver" "18.0"; then
-                    echo "[✓] Node.js $node_ver (requires 18+)"
+                if version_ge "$node_ver" "20.0"; then
+                    echo "[✓] Node.js $node_ver (requires 20+)"
                 else
-                    echo "[✗] Node.js $node_ver (requires 18+) - version too low"
+                    echo "[✗] Node.js $node_ver (requires 20+) - version too low"
                     FAILURES=$((FAILURES + 1))
                 fi
             else
@@ -138,7 +138,7 @@ else
             FAILURES=$((FAILURES + 1))
         fi
     else
-        echo "[✗] Node.js not found (requires 18+)"
+        echo "[✗] Node.js not found (requires 20+)"
         FAILURES=$((FAILURES + 1))
     fi
 fi
