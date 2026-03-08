@@ -1019,7 +1019,7 @@ main() {
                 local alsa_pkg="libasound2"
                 local alsa_candidate
                 alsa_candidate=$(apt-cache policy libasound2 2>/dev/null | grep 'Candidate:' | awk '{print $2}')
-                if [ "$alsa_candidate" = "(none)" ] && apt-cache policy libasound2t64 2>/dev/null | grep -q 'Candidate:'; then
+                if { [ -z "$alsa_candidate" ] || [ "$alsa_candidate" = "(none)" ]; } && apt-cache policy libasound2t64 2>/dev/null | grep -q 'Candidate:'; then
                     alsa_pkg="libasound2t64"
                 fi
                 # Core Chromium dependencies for Puppeteer/Playwright
