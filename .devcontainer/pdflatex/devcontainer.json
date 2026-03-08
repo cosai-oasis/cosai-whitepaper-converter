@@ -13,11 +13,9 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"charliermarsh.ruff"
-			],
-			"settings": {
-				"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
-			}
+				"charliermarsh.ruff",
+				"ms-python.python"
+			]
 		}
 	},
 
