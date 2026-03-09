@@ -110,7 +110,21 @@ Example: Moving the title position:
 
 ### Adding/Removing TOC
 
-To remove table of contents:
+The PDF automatically generates a native LaTeX table of contents. Any Markdown-based TOC in your source file is **automatically stripped** during preprocessing to avoid duplication.
+
+**Supported Markdown TOC formats** (auto-stripped):
+- Heading levels 1–4: `# Table of Contents` through `#### Table of Contents`
+- Bold text: `**Table of Contents**`
+- Case-insensitive on "Contents" vs "contents"
+
+**Not auto-stripped** (will appear as duplicate text in the PDF):
+- H5/H6 headings (`#####`, `######`)
+- Plain unformatted text (e.g., `Table of Contents` without bold or heading markup)
+- Variant labels like "Contents", "TOC", or "In This Document"
+
+If your whitepaper uses a Markdown TOC, use one of the supported formats above to ensure it is stripped cleanly.
+
+To remove the native PDF table of contents from the LaTeX template:
 ```latex
 % Comment out or remove:
 % \tableofcontents
@@ -219,6 +233,30 @@ def process_markdown(input_file, engine=None, temp_dir=None):
 
     # ... rest of function
 ```
+
+### Built-in: HTML Comment-Wrapped Pandoc Attributes
+
+Pandoc attributes like `{width=55%}` control image sizing in PDF output, but GitHub renders them as visible text. To hide them on GitHub while preserving them for PDF conversion, wrap them in HTML comments:
+
+```markdown
+![Diagram](diagrams/example.svg)<!--{width=55%}-->
+```
+
+The converter automatically strips the `<!-- -->` wrapper, producing:
+
+```markdown
+![Diagram](diagrams/example.svg){width=55%}
+```
+
+This works for any Pandoc attribute block: `{width=...}`, `{.class}`, `{#id}`, or combinations thereof.
+
+Raw LaTeX commands are also supported:
+
+```markdown
+<!--\newpage-->
+```
+
+becomes `\newpage` in the Pandoc input, forcing a page break in the PDF without showing anything on GitHub.
 
 ## Page Layout
 

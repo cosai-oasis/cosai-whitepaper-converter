@@ -6,15 +6,18 @@
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {}
 	},
 
-	"onCreateCommand": "./scripts/install-deps.sh && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && npm install",
+	"onCreateCommand": "./scripts/install-deps.sh",
 
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"charliermarsh.ruff"
+				"charliermarsh.ruff",
+				"ms-python.python"
 			],
 			"settings": {
-				"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+				"python.testing.pytestEnabled": true,
+				"python.testing.unittestEnabled": false,
+				"python.testing.pytestArgs": ["tests"]
 			}
 		}
 	},

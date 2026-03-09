@@ -7,8 +7,8 @@ This guide covers installing the CoSAI Whitepaper Converter and its dependencies
 | Dependency | Minimum Version | Purpose |
 |------------|-----------------|---------|
 | Python | 3.12+ | Core script runtime |
-| Pandoc | 3.8.2.1+ | Markdown to LaTeX conversion |
-| Node.js | 18+ | Mermaid diagram rendering |
+| Pandoc | 3.9+ | Markdown to LaTeX conversion |
+| Node.js | 20+ | Mermaid diagram rendering |
 | LaTeX engine | Any recent | PDF generation |
 
 ## Platform Support
@@ -154,8 +154,8 @@ Run the verification script to check all dependencies:
 Expected output when all dependencies are installed:
 ```
 [✓] Python 3.12.3 (requires 3.12+)
-[✓] Node.js 22.14.0 (requires 18+)
-[✓] Pandoc 3.8.2.1 (requires 3.8.2.1+)
+[✓] Node.js 24.0.0 (requires 20+)
+[✓] Pandoc 3.9 (requires 3.9+)
 [✓] tectonic 0.15.0
 [✓] Chromium configured
 [✓] python-frontmatter 1.1.0
@@ -170,10 +170,10 @@ Expected output when all dependencies are installed:
 python --version  # Should show 3.12+
 
 # Pandoc
-pandoc --version  # Should show 3.8.2.1+
+pandoc --version  # Should show 3.9+
 
 # Node.js
-node --version    # Should show 18+
+node --version    # Should show 20+
 npx --version     # Should be available
 
 # LaTeX engine (check the one you installed)

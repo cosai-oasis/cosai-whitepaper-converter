@@ -64,7 +64,7 @@
   },
   "skip_node": {
     "name": "CoSAI Whitepaper Converter without Node install",
-    "image": "mcr.microsoft.com/devcontainers/javascript-node:18",
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
     "features": {
       "ghcr.io/cosai-oasis/cosai-whitepaper-converter/whitepaper-converter:1": {
         "latexEngine": "tectonic",
