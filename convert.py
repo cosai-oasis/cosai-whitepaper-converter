@@ -541,10 +541,11 @@ def process_markdown(
     content = normalize_unicode_for_latex(content, engine)
 
     # 3. Remove "Table of Contents" section
-    # Regex to match "# Table of contents" (case insensitive) and the following list
-    # Matches until the next header or end of string
+    # Matches H1-H4 headings (# through ####) or bold (**) "Table of Contents"
+    # at line start, consuming everything until the next heading or end of string
     toc_pattern = re.compile(
-        r"^#\s*Table of [Cc]ontents.*?(?=^#|\Z)", re.MULTILINE | re.DOTALL
+        r"^(?:#{1,4}\s+|\*\*)Table of [Cc]ontents\*{0,2}.*?(?=^#|\Z)",
+        re.MULTILINE | re.DOTALL,
     )
     content = toc_pattern.sub("", content)
 

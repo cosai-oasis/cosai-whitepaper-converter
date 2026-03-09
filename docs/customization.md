@@ -110,7 +110,21 @@ Example: Moving the title position:
 
 ### Adding/Removing TOC
 
-To remove table of contents:
+The PDF automatically generates a native LaTeX table of contents. Any Markdown-based TOC in your source file is **automatically stripped** during preprocessing to avoid duplication.
+
+**Supported Markdown TOC formats** (auto-stripped):
+- Heading levels 1–4: `# Table of Contents` through `#### Table of Contents`
+- Bold text: `**Table of Contents**`
+- Case-insensitive on "Contents" vs "contents"
+
+**Not auto-stripped** (will appear as duplicate text in the PDF):
+- H5/H6 headings (`#####`, `######`)
+- Plain unformatted text (e.g., `Table of Contents` without bold or heading markup)
+- Variant labels like "Contents", "TOC", or "In This Document"
+
+If your whitepaper uses a Markdown TOC, use one of the supported formats above to ensure it is stripped cleanly.
+
+To remove the native PDF table of contents from the LaTeX template:
 ```latex
 % Comment out or remove:
 % \tableofcontents
