@@ -230,6 +230,12 @@ Converting test.md...
 ✅ /path/to/test.pdf
 ```
 
+With figure reference auto-numbering:
+
+```bash
+python convert.py test.md test.pdf --figure-refs
+```
+
 ## Using as a Git Submodule
 
 The converter is designed to be embedded in other repositories as a git submodule. This allows whitepaper source files to live alongside code while sharing a common, versioned conversion toolchain.

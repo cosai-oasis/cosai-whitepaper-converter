@@ -492,6 +492,86 @@ def strip_trailing_whitespace(text: str) -> str:
     return "\n".join(processed_lines)
 
 
+def build_figure_registry(content: str) -> dict[str, int]:
+    """Scan document for {#fig-*} Pandoc anchor attributes and assign numbers.
+
+    Processes anchors in document order. Duplicate IDs keep only the first
+    occurrence. Non-fig anchors (e.g. {#tbl-data}, {#sec-intro}) are ignored.
+
+    Args:
+        content: Markdown content to scan (after strip_html_comment_attributes
+                 has already unwrapped any <!--{#fig-*}--> comments).
+
+    Returns:
+        Mapping of anchor ID to sequential figure number, e.g.
+        {"fig-arch": 1, "fig-flow": 2}.
+    """
+    pattern = re.compile(r"\{#(fig-[a-zA-Z0-9._-]+)[^}]*\}")
+    registry: dict[str, int] = {}
+    counter = 0
+    for match in pattern.finditer(content):
+        anchor_id = match.group(1)
+        if anchor_id not in registry:
+            counter += 1
+            registry[anchor_id] = counter
+    return registry
+
+
+def validate_figure_refs(content: str, registry: dict[str, int]) -> list[str]:
+    """Find all (#fig-*) reference targets not declared in the registry.
+
+    Deduplicates: the same broken anchor appearing multiple times is reported
+    once. Order of first appearance is preserved.
+
+    Args:
+        content: Markdown content to check.
+        registry: Figure registry built by build_figure_registry().
+
+    Returns:
+        List of anchor IDs referenced but not found in registry, in order of
+        first appearance. Empty list if all references are satisfied.
+    """
+    pattern = re.compile(r"(?<!!)\[[^\]]*\]\(#(fig-[a-zA-Z0-9._-]+)\)")
+    seen: set[str] = set()
+    broken: list[str] = []
+    for match in pattern.finditer(content):
+        anchor_id = match.group(1)
+        if anchor_id not in registry and anchor_id not in seen:
+            seen.add(anchor_id)
+            broken.append(anchor_id)
+    return broken
+
+
+def rewrite_figure_refs(
+    content: str, registry: dict[str, int], label: str = "Figure"
+) -> str:
+    """Replace figure link text with the canonical label and number.
+
+    Transforms ``[any text](#fig-anchor)`` to ``[Figure N](#fig-anchor)``
+    where N comes from the registry. Links to non-fig anchors are left
+    unchanged. Image syntax ``![alt](path)`` is never modified.
+
+    Args:
+        content: Markdown content to rewrite.
+        registry: Figure registry built by build_figure_registry().
+        label: Prefix to use before the figure number (default: "Figure").
+
+    Returns:
+        Content with all registered figure links rewritten.
+    """
+    # Match [text](#fig-anchor) but NOT ![text](#fig-anchor) (image syntax)
+    pattern = re.compile(r"(?<!!)\[([^\]]*)\]\(#(fig-[a-zA-Z0-9._-]+)\)")
+
+    def replacer(match: re.Match) -> str:
+        anchor_id = match.group(2)
+        if anchor_id in registry:
+            number = registry[anchor_id]
+            return f"[{label} {number}](#{anchor_id})"
+        return match.group(0)
+
+    return pattern.sub(replacer, content)
+
+
 def strip_html_comment_attributes(content: str) -> str:
     """Strip HTML comment wrappers from Pandoc/LaTeX directives.
 
@@ -507,7 +587,11 @@ def strip_html_comment_attributes(content: str) -> str:
 
 
 def process_markdown(
-    input_file: str, engine: str | None = None, temp_dir: str | None = None
+    input_file: str,
+    engine: str | None = None,
+    temp_dir: str | None = None,
+    figure_refs: bool = False,
+    figure_label: str = "Figure",
 ) -> str:
     """Read a Markdown file and preprocess it for LaTeX conversion.
 
@@ -517,6 +601,7 @@ def process_markdown(
     3. Remove manual Table of Contents sections
     4. Convert HTML anchor tags to Pandoc format
     5. Strip HTML comment wrappers from Pandoc attributes
+    5a. (optional) Build figure registry, validate refs, rewrite figure links
     6. Convert Mermaid diagrams to SVG images
     7. Download remote images to local files
     8. Convert HTML break tags to LaTeX newlines
@@ -527,9 +612,18 @@ def process_markdown(
             VALID_LATEX_ENGINES (tectonic, pdflatex, xelatex, lualatex).
             Pass None to preserve all Unicode characters.
         temp_dir: Directory to create temp files in. If None, uses cwd.
+        figure_refs: When True, scan for {#fig-*} anchors, validate that all
+            (#fig-*) link targets are declared, and rewrite link text to
+            "{figure_label} N". Raises ConversionError on broken refs.
+        figure_label: Label prefix used when rewriting figure links (e.g.
+            "Figure" produces "Figure 1"). Only used when figure_refs=True.
 
     Returns:
         Processed Markdown content ready for Pandoc conversion.
+
+    Raises:
+        ConversionError: If figure_refs=True and the document contains links
+            to undeclared {#fig-*} anchors.
     """
     with open(input_file, "r") as f:
         content = f.read()
@@ -558,6 +652,18 @@ def process_markdown(
     # Converts <!--{width=55%}--> to {width=55%} so attributes hidden from
     # GitHub rendering are still picked up by Pandoc
     content = strip_html_comment_attributes(content)
+
+    # 5a. Figure reference processing (optional, runs after comment unwrapping)
+    if figure_refs:
+        registry = build_figure_registry(content)
+        broken = validate_figure_refs(content, registry)
+        if broken:
+            broken_list = ", ".join(broken)
+            raise ConversionError(
+                f"Broken figure reference(s): {broken_list}. "
+                f"Declare each anchor with {{#fig-id}} in the document."
+            )
+        content = rewrite_figure_refs(content, registry, label=figure_label)
 
     # 6. Handle Mermaid blocks
     # Regex to find mermaid code blocks: ```mermaid ... ```
@@ -636,6 +742,16 @@ def main() -> None:
         action="store_true",
         help="Save intermediate files (processed.md, .tex) and show verbose output",
     )
+    parser.add_argument(
+        "--figure-refs",
+        action="store_true",
+        help="Auto-number figures and rewrite [text](#fig-*) links to 'Figure N'",
+    )
+    parser.add_argument(
+        "--figure-label",
+        default="Figure",
+        help="Label prefix used when rewriting figure links (default: Figure)",
+    )
 
     args = parser.parse_args()
 
@@ -655,7 +771,11 @@ def main() -> None:
         # Process markdown with temp directory for diagrams and images
         try:
             processed_content = process_markdown(
-                args.input_file, engine, temp_dir=temp_dir
+                args.input_file,
+                engine,
+                temp_dir=temp_dir,
+                figure_refs=args.figure_refs,
+                figure_label=args.figure_label,
             )
         except ConversionError as exc:
             print(f"❌ {exc}", file=sys.stderr)

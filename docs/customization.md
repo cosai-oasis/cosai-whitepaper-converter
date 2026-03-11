@@ -131,6 +131,71 @@ To remove the native PDF table of contents from the LaTeX template:
 % \newpage
 ```
 
+### Figure References
+
+The PDF auto-numbers figures via LaTeX (`Figure 1`, `Figure 2`, etc.). To cross-reference figures from your Markdown source — in a way that works on both GitHub and in the PDF — use the `--figure-refs` flag.
+
+#### How it works
+
+1. **Declare** a figure anchor using Pandoc attribute syntax `{#fig-*}`:
+
+   ```markdown
+   ![Architecture Overview](arch.png)<!--{#fig-architecture}-->
+   ```
+
+   For Mermaid diagrams, place the anchor comment before the code fence:
+
+   ```markdown
+   <!--{#fig-dataflow}-->
+   ```mermaid
+   graph LR
+     A[Input] --> B[Process] --> C[Output]
+   ```
+   ```
+
+2. **Reference** figures with standard Markdown links using descriptive text:
+
+   ```markdown
+   See [Architecture Overview](#fig-architecture) for details.
+
+   The data flows as shown in [Data Flow](#fig-dataflow).
+   ```
+
+3. **Convert** with the flag:
+
+   ```bash
+   python convert.py input.md output.pdf --figure-refs
+   ```
+
+#### What happens
+
+| Context | Renders as |
+|---------|-----------|
+| **GitHub** (no processing) | "See Architecture Overview" — clickable link to the image |
+| **PDF** with `--figure-refs` | "See Figure 1" — numbered reference matching the LaTeX caption |
+| **PDF** without flag | "See Architecture Overview" — link text unchanged |
+
+The preprocessor scans for `{#fig-*}` anchors in document order, assigns sequential numbers, and rewrites each `[text](#fig-*)` link to `[Figure N](#fig-*)`.
+
+#### Custom label
+
+Use `--figure-label` to change the prefix (default: `Figure`):
+
+```bash
+python convert.py input.md output.pdf --figure-refs --figure-label "Diagram"
+# Produces "See Diagram 1" instead of "See Figure 1"
+```
+
+#### Validation
+
+If a link points to a `#fig-*` anchor that doesn't exist in the document, the converter will **error with diagnostics** listing all broken references. This catches typos and stale references before they reach the PDF.
+
+#### Anchor ID conventions
+
+- Anchor IDs **must** start with `fig-` (e.g., `{#fig-architecture}`, `{#fig-data.flow}`)
+- Dots, hyphens, underscores, and alphanumeric characters are supported
+- Non-`fig-` anchors (e.g., `{#tbl-data}`, `{#sec-intro}`) are ignored
+
 ## Section Formatting
 
 Section styles are defined in `cosai.sty`:
@@ -221,7 +286,7 @@ doc.metadata["config"] = {
 Add custom Markdown preprocessing in `convert.py`:
 
 ```python
-def process_markdown(input_file, engine=None, temp_dir=None):
+def process_markdown(input_file, engine=None, temp_dir=None, figure_refs=False, figure_label="Figure"):
     with open(input_file, "r") as f:
         content = f.read()
 
