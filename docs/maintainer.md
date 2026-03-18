@@ -162,7 +162,7 @@ Environment variables for `scripts/install-deps.sh`:
 |----------|---------|---------|
 | `LATEX_ENGINE` | `tectonic` | LaTeX engine: `tectonic`, `pdflatex`, `xelatex`, `lualatex` |
 | `SKIP_PYTHON` | `false` | Skip Python 3.12 installation |
-| `SKIP_NODE` | `false` | Skip Node.js 22 LTS installation |
+| `SKIP_NODE` | `false` | Skip Node.js 24 LTS installation |
 | `SKIP_CHROMIUM` | `false` | Skip Chromium configuration |
 | `_TEST_EUID` | *(unset)* | Override `EUID` for testing `check_sudo()` in root containers |
 
@@ -173,13 +173,13 @@ Versions actually installed by `scripts/install-deps.sh`:
 | Dependency | Installed Version | Minimum Enforced | Enforced By |
 |------------|-------------------|------------------|-------------|
 | Python | 3.12.x | 3.12+ | `verify-deps.sh` |
-| Node.js | 22 LTS (via NodeSource `setup_22.x`) | 18+ | `verify-deps.sh` |
-| Pandoc | 3.8.2.1 (from GitHub releases) | 3.8.2.1+ | `verify-deps.sh` |
+| Node.js | 24 LTS (via NodeSource `setup_24.x`) | 20+ | `verify-deps.sh` |
+| Pandoc | 3.9 (from GitHub releases) | 3.9+ | `verify-deps.sh` |
 | Tectonic | 0.15.0 (from GitHub releases) | any | `verify-deps.sh` (presence only) |
 | Mermaid CLI | ^11.12.0 (`package.json`) | any | `verify-deps.sh` (presence only) |
 | python-frontmatter | 1.1.0 (`requirements.txt`) | any | `verify-deps.sh` (presence only) |
 
-**Why Pandoc 3.8.2.1?** Pandoc 3.8.1 emitted `\def\LTcaptype{}` for uncaptioned tables, which broke with the `caption` LaTeX package ("No counter '' defined"). Fixed in [jgm/pandoc#11201](https://github.com/jgm/pandoc/issues/11201).
+**Why Pandoc 3.9?** Pandoc 3.9 adds the `+alerts` extension for native GFM callout support (`> [!NOTE]` syntax). Additionally, 3.8.2.1 fixed a table counter bug where `\def\LTcaptype{}` broke the `caption` LaTeX package ("No counter '' defined") — see [jgm/pandoc#11201](https://github.com/jgm/pandoc/issues/11201).
 
 ## Concurrency & Deduplication
 

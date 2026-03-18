@@ -72,7 +72,7 @@ sudo apt install texlive-fonts-extra
 **Solutions**:
 1. Verify Node.js is installed:
    ```bash
-   node --version  # Should be 18+
+   node --version  # Should be 20+
    ```
 2. Verify npx is available:
    ```bash
@@ -155,11 +155,11 @@ This will detect Playwright Chromium or system Chromium and configure
 
 **Cause**: Pandoc version too old.
 
-**Solution**: Upgrade to Pandoc 3.8.2.1+:
+**Solution**: Upgrade to Pandoc 3.9+:
 ```bash
 # Ubuntu (get latest from GitHub)
-wget https://github.com/jgm/pandoc/releases/download/3.8.2.1/pandoc-3.8.2.1-1-amd64.deb
-sudo dpkg -i pandoc-3.8.2.1-1-amd64.deb
+wget https://github.com/jgm/pandoc/releases/download/3.9/pandoc-3.9-1-amd64.deb
+sudo dpkg -i pandoc-3.9-1-amd64.deb
 ```
 
 ### "No counter '' defined" Error
@@ -168,7 +168,7 @@ sudo dpkg -i pandoc-3.8.2.1-1-amd64.deb
 
 **Cause**: Pandoc versions before 3.8.2.1 emitted `\def\LTcaptype{}` for uncaptioned tables, which broke the `caption` LaTeX package.
 
-**Solution**: Upgrade Pandoc to 3.8.2.1 or later (see above). This was fixed in [Pandoc #11201](https://github.com/jgm/pandoc/issues/11201).
+**Solution**: Upgrade Pandoc to 3.9+ (the current project minimum). This was fixed in [Pandoc #11201](https://github.com/jgm/pandoc/issues/11201) starting with version 3.8.2.1.
 
 ## Image Issues
 

@@ -1,6 +1,6 @@
 {
   "id": "whitepaper-converter",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "name": "CoSAI Whitepaper Converter",
   "description": "Dependencies for converting Markdown to PDF with CoSAI branding",
   "options": {

@@ -735,21 +735,21 @@ install_python312_apt() {
     return 1
 }
 
-# Install Node.js 18+ on apt-get systems via NodeSource
-install_nodejs18_apt() {
-    # Check if node 18+ is already available
+# Install Node.js 20+ on apt-get systems via NodeSource
+install_nodejs_apt() {
+    # Check if node 20+ is already available
     if command -v node >/dev/null 2>&1; then
         local ver
         ver=$(node --version 2>/dev/null | sed 's/^v//' || echo "0.0.0")
         local major="${ver%%.*}"
-        if [ "$major" -ge 18 ] 2>/dev/null; then
+        if [ "$major" -ge 20 ] 2>/dev/null; then
             log_success "Node.js $ver already meets requirements"
             return 0
         fi
     fi
 
-    # Install via NodeSource (Node.js 22 LTS)
-    log_info "Setting up NodeSource repository for Node.js 22..."
+    # Install via NodeSource (Node.js 24 LTS)
+    log_info "Setting up NodeSource repository for Node.js 24..."
 
     # NodeSource setup requires curl
     if ! command -v curl >/dev/null 2>&1; then
@@ -763,7 +763,7 @@ install_nodejs18_apt() {
     # (Using temp file to avoid pipe issues with SUDO expansion)
     local tmp_setup
     tmp_setup=$(mktemp)
-    if curl -fsSL https://deb.nodesource.com/setup_22.x -o "$tmp_setup" 2>/dev/null; then
+    if curl -fsSL https://deb.nodesource.com/setup_24.x -o "$tmp_setup" 2>/dev/null; then
         if [ -n "$SUDO" ]; then
             $SUDO -E bash "$tmp_setup" >/dev/null 2>&1 || {
                 rm -f "$tmp_setup"
@@ -796,7 +796,7 @@ install_nodejs18_apt() {
         log_warning "Failed to download NodeSource setup script"
     fi
 
-    log_error "Failed to install Node.js 18+"
+    log_error "Failed to install Node.js 20+"
     return 1
 }
 
@@ -856,6 +856,14 @@ main() {
     local script_path="${BASH_SOURCE[0]}"
     SCRIPT_DIR="$(cd "${script_path%/*}" && pwd)"
 
+    # Derive project root from script directory
+    local project_root
+    project_root="$(cd "$SCRIPT_DIR/.." && pwd)"
+    PROJECT_ROOT="$project_root"
+
+    # Determine effective UID (allow override for testing)
+    local effective_uid="${_TEST_EUID:-${EUID:-$(id -u)}}"
+
     # Track critical installation failures
     local install_failures=0
 
@@ -875,32 +883,32 @@ main() {
                 # Install Python 3.12+ (standard python3 may be too old on some distros)
                 install_python312_apt || {
                     log_warning "Falling back to system python3"
-                    install_packages "$PKG_MANAGER" python3 python3-pip
+                    install_packages "$PKG_MANAGER" python3 python3-pip python3-venv
                 }
                 # Ensure pip is installed
                 install_packages "$PKG_MANAGER" python3-pip 2>/dev/null || true
                 ;;
             apk)
-                install_packages "$PKG_MANAGER" python3 py3-pip
+                install_packages "$PKG_MANAGER" python3 py3-pip py3-virtualenv
                 ;;
             brew)
                 install_packages "$PKG_MANAGER" python@3.12
                 ;;
             dnf)
-                install_packages "$PKG_MANAGER" python3 python3-pip
+                install_packages "$PKG_MANAGER" python3 python3-pip python3-virtualenv
                 ;;
         esac
     fi
 
-    # Install Node.js 18+ (unless skipped)
+    # Install Node.js 20+ (unless skipped)
     if [ "${SKIP_NODE:-false}" = "true" ]; then
         log_info "Skipping Node.js installation"
     else
-        log_info "Installing Node.js 18+..."
+        log_info "Installing Node.js 20+..."
         case "$PKG_MANAGER" in
             apt-get)
-                # Use NodeSource to get Node.js 18+ (system packages are too old)
-                install_nodejs18_apt || {
+                # Use NodeSource to get Node.js 20+ (system packages are too old)
+                install_nodejs_apt || {
                     log_warning "Falling back to system nodejs"
                     install_packages "$PKG_MANAGER" nodejs npm
                 }
@@ -921,8 +929,8 @@ main() {
     log_info "Installing Pandoc 3.9+..."
 
     # Check if package manager has a sufficient version BEFORE installing
-    if check_pandoc_pkg_version "$PKG_MANAGER" 3 8 2; then
-        log_info "Package manager has Pandoc >= 3.8.2, installing from package manager..."
+    if check_pandoc_pkg_version "$PKG_MANAGER" 3 9 0; then
+        log_info "Package manager has Pandoc >= 3.9, installing from package manager..."
         install_packages "$PKG_MANAGER" pandoc
     else
         log_info "Package manager Pandoc is too old or unavailable, installing from GitHub releases..."
@@ -978,8 +986,99 @@ main() {
         exit 1
     fi
 
-    # Install python-frontmatter (unless Python is skipped)
-    if [ "${SKIP_PYTHON:-false}" != "true" ]; then
+    # Install @mermaid-js/mermaid-cli (unless Node is skipped)
+    # Non-root with package.json: local npm install (uses lockfile for pinned versions)
+    # Root or no package.json: global npm install -g (feature/CI path)
+    if [ "${SKIP_NODE:-false}" != "true" ]; then
+        if [ "$effective_uid" -ne 0 ] && [ -f "$PROJECT_ROOT/package.json" ]; then
+            log_info "Installing Node.js dependencies locally..."
+            npm install --prefix "$PROJECT_ROOT" || {
+                log_warning "Failed to install Node.js dependencies locally"
+            }
+        elif command -v npm >/dev/null 2>&1; then
+            log_info "Installing @mermaid-js/mermaid-cli via npm..."
+            $SUDO npm install -g @mermaid-js/mermaid-cli || {
+                log_warning "Failed to install @mermaid-js/mermaid-cli via npm"
+            }
+        else
+            log_warning "npm not found, skipping mermaid-cli installation"
+        fi
+    fi
+
+    # Configure Chromium (unless skipped)
+    if [ "${SKIP_CHROMIUM:-false}" = "true" ]; then
+        log_info "Skipping Chromium configuration"
+    else
+        log_info "Installing Chromium dependencies..."
+        # Install Puppeteer/Playwright dependencies for headless Chrome
+        case "$PKG_MANAGER" in
+            apt-get)
+                # Detect correct ALSA package name (Ubuntu 24.04+ uses libasound2t64)
+                # apt-cache show succeeds for virtual packages, so use apt-cache policy
+                # to check if libasound2 has a real installable candidate
+                local alsa_pkg="libasound2"
+                local alsa_candidate
+                alsa_candidate=$(apt-cache policy libasound2 2>/dev/null | grep 'Candidate:' | awk '{print $2}')
+                if { [ -z "$alsa_candidate" ] || [ "$alsa_candidate" = "(none)" ]; } && apt-cache policy libasound2t64 2>/dev/null | grep -q 'Candidate:'; then
+                    alsa_pkg="libasound2t64"
+                fi
+                # Core Chromium dependencies for Puppeteer/Playwright
+                install_packages "$PKG_MANAGER" \
+                    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
+                    libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
+                    libxdamage1 libxfixes3 libxrandr2 libgbm1 "$alsa_pkg" \
+                    libpango-1.0-0 libcairo2 2>/dev/null || {
+                    log_warning "Some Chromium dependencies may be missing"
+                }
+                ;;
+            apk)
+                install_packages "$PKG_MANAGER" \
+                    chromium nss freetype harfbuzz ca-certificates ttf-freefont 2>/dev/null || {
+                    log_warning "Some Chromium dependencies may be missing"
+                }
+                ;;
+            dnf)
+                install_packages "$PKG_MANAGER" \
+                    nss nspr atk at-spi2-atk cups-libs libdrm \
+                    libxkbcommon libXcomposite libXdamage libXrandr \
+                    mesa-libgbm alsa-lib pango cairo 2>/dev/null || {
+                    log_warning "Some Chromium dependencies may be missing"
+                }
+                ;;
+        esac
+
+        log_info "Configuring Chromium..."
+        if [ -f "$SCRIPT_DIR/configure-chromium.sh" ]; then
+            "$SCRIPT_DIR/configure-chromium.sh" --auto || {
+                log_warning "Chromium configuration failed or was skipped"
+            }
+        else
+            log_warning "configure-chromium.sh not found at $SCRIPT_DIR/configure-chromium.sh"
+        fi
+    fi
+
+    # Create Python virtual environment and install dependencies (non-root only)
+    local venv_created=false
+    if [ "${SKIP_PYTHON:-false}" != "true" ] && [ "${SKIP_VENV:-false}" != "true" ] \
+        && [ "$effective_uid" -ne 0 ] && [ -f "$PROJECT_ROOT/requirements.txt" ]; then
+        log_info "Creating Python virtual environment..."
+        if python3 -m venv --clear "$PROJECT_ROOT/.venv"; then
+            if "$PROJECT_ROOT/.venv/bin/pip" install -r "$PROJECT_ROOT/requirements.txt"; then
+                venv_created=true
+                log_success "Python virtual environment created at $PROJECT_ROOT/.venv"
+                log_info "Activate with: source $PROJECT_ROOT/.venv/bin/activate"
+            else
+                log_warning "Failed to install Python dependencies into .venv"
+                rm -rf "$PROJECT_ROOT/.venv"
+            fi
+        else
+            log_warning "Failed to create Python virtual environment"
+            log_warning "Falling back to system pip (only python-frontmatter, not full requirements.txt)"
+        fi
+    fi
+
+    # Install python-frontmatter (unless Python is skipped or venv already handled it)
+    if [ "${SKIP_PYTHON:-false}" != "true" ] && [ "$venv_created" = "false" ]; then
         log_info "Installing python-frontmatter via pip..."
         local installed=false
 
@@ -1027,61 +1126,6 @@ main() {
 
         if [ "$installed" = "false" ]; then
             log_warning "Failed to install python-frontmatter via pip"
-        fi
-    fi
-
-    # Install @mermaid-js/mermaid-cli (unless Node is skipped)
-    if [ "${SKIP_NODE:-false}" != "true" ]; then
-        log_info "Installing @mermaid-js/mermaid-cli via npm..."
-        if command -v npm >/dev/null 2>&1; then
-            $SUDO npm install -g @mermaid-js/mermaid-cli || {
-                log_warning "Failed to install @mermaid-js/mermaid-cli via npm"
-            }
-        else
-            log_warning "npm not found, skipping mermaid-cli installation"
-        fi
-    fi
-
-    # Configure Chromium (unless skipped)
-    if [ "${SKIP_CHROMIUM:-false}" = "true" ]; then
-        log_info "Skipping Chromium configuration"
-    else
-        log_info "Installing Chromium dependencies..."
-        # Install Puppeteer/Playwright dependencies for headless Chrome
-        case "$PKG_MANAGER" in
-            apt-get)
-                # Core Chromium dependencies for Puppeteer/Playwright
-                install_packages "$PKG_MANAGER" \
-                    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
-                    libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
-                    libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 \
-                    libpango-1.0-0 libcairo2 2>/dev/null || {
-                    log_warning "Some Chromium dependencies may be missing"
-                }
-                ;;
-            apk)
-                install_packages "$PKG_MANAGER" \
-                    chromium nss freetype harfbuzz ca-certificates ttf-freefont 2>/dev/null || {
-                    log_warning "Some Chromium dependencies may be missing"
-                }
-                ;;
-            dnf)
-                install_packages "$PKG_MANAGER" \
-                    nss nspr atk at-spi2-atk cups-libs libdrm \
-                    libxkbcommon libXcomposite libXdamage libXrandr \
-                    mesa-libgbm alsa-lib pango cairo 2>/dev/null || {
-                    log_warning "Some Chromium dependencies may be missing"
-                }
-                ;;
-        esac
-
-        log_info "Configuring Chromium..."
-        if [ -f "$SCRIPT_DIR/configure-chromium.sh" ]; then
-            "$SCRIPT_DIR/configure-chromium.sh" --auto || {
-                log_warning "Chromium configuration failed or was skipped"
-            }
-        else
-            log_warning "configure-chromium.sh not found at $SCRIPT_DIR/configure-chromium.sh"
         fi
     fi
 

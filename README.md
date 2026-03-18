@@ -33,8 +33,8 @@ options:
 ## System Requirements
 
 - **Python**: 3.12 or higher
-- **Pandoc**: 3.8.2.1 or higher
-- **Node.js**: 18 or higher (for Mermaid CLI)
+- **Pandoc**: 3.9 or higher
+- **Node.js**: 20 or higher (for Mermaid CLI)
 - **LaTeX engine**: One of: tectonic (default), pdflatex, xelatex, or lualatex
 
 ## Installation Options
@@ -140,9 +140,10 @@ Testing several markdown files has revealed a few best practices or things to no
 1. White space at the end of lines, such as lists, causes Markdown to render as separate sections (includes extra vertical whitespace) and will mess up PDF formatting. The `convert.py` script will strip any line-ending whitespace globally. 
 1. Mermaid files with a title will have that title extracted, and stripped, so that it can be used in the latex `\figure` caption. Mermaid is converted to PDF and will have a consistent CoSAI theme applied unless already present in the metadata header. (`config:` section)
 1. Any break, `<br>`, and variants, are converted to `\newline`. Errant `<br>` will break the LaTeX compilation. If you get an error about `\newline`, try this.
+1. Pandoc attributes like `{width=55%}` and raw LaTeX commands like `\newpage` can be wrapped in HTML comments (`<!--{width=55%}-->`, `<!--\newpage-->`) to hide them from GitHub rendering. The converter automatically strips the comment wrapper during PDF conversion so they take effect in LaTeX output.
 
 ## Known Issues
-1. Currently there is an issue where some formatted text, such as `**I want this bold**` will not be converted to a `\textbf` and will not not be bold. So far, this has only been observed in Markdown Tables.
+1. ~~**Bold text in tables not rendering**~~ Fixed by upgrading Pandoc to 3.9. Earlier versions occasionally failed to convert `**bold**` to `\textbf` inside Markdown tables.
 2. ~~**"No counter '' defined"**~~ Fixed by upgrading Pandoc to 3.8.2.1. Pandoc 3.8.1 emitted `\def\LTcaptype{}` for uncaptioned tables, which broke with the `caption` package. If you see this error, upgrade Pandoc.
 
 ## Troubleshooting
@@ -153,7 +154,7 @@ Testing several markdown files has revealed a few best practices or things to no
 - **`\newline` errors**: Often caused by errant `<br>` tags in unexpected places. Check your Markdown source.
 
 ### Mermaid rendering issues
-- Ensure Node.js 18+ is installed
+- Ensure Node.js 20+ is installed
 - Check that `npx` is available in your PATH
 - Mermaid CLI is run via `npx -y @mermaid-js/mermaid-cli`
 
@@ -165,7 +166,7 @@ python convert.py input.md output.pdf --debug
 This produces `output_debug.md` (preprocessed Markdown) and `output_debug.tex` (intermediate LaTeX) alongside the PDF.
 
 ### Pandoc not found
-- Verify Pandoc is installed: `pandoc --version` (must be 3.8.2.1+)
+- Verify Pandoc is installed: `pandoc --version` (must be 3.9+)
 - Ensure Pandoc is in your PATH
 - The devcontainer includes Pandoc pre-installed
 

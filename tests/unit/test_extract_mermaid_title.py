@@ -165,20 +165,24 @@ graph TD
         assert title is None or isinstance(title, str)
         assert isinstance(code, str)
 
-    def test_extract_mermaid_title_malformed_yaml_exits_with_error(self, capsys):
+    def test_extract_mermaid_title_malformed_yaml_raises_conversion_error(self):
         """
         Given: Mermaid code with syntactically invalid YAML frontmatter
         When: extract_mermaid_title is called
-        Then: Exits with code 1 and prints a diagnostic to stderr
+        Then: Raises ConversionError with a diagnostic message
         """
+        from convert import ConversionError
+
         mermaid_code = (
             "---\nconfig:\n theme: neutral\n  layout: elk\n---\ngraph TD\n    A --> B"
         )
 
-        with pytest.raises(SystemExit) as exc_info:
+        with pytest.raises(ConversionError) as exc_info:
             extract_mermaid_title(mermaid_code)
 
-        assert exc_info.value.code == 1
-        captured = capsys.readouterr()
-        assert "Invalid YAML frontmatter" in captured.err
-        assert "graph TD" in captured.err
+        assert exc_info.value.user_message  # non-empty
+        assert (
+            "mermaid" in exc_info.value.user_message.lower()
+            or "frontmatter" in exc_info.value.user_message.lower()
+            or "graph" in exc_info.value.user_message
+        )
