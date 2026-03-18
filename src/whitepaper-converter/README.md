@@ -129,7 +129,17 @@ cosai-convert input.md output.pdf
 With options:
 
 ```bash
+# Metadata and engine
 cosai-convert input.md output.pdf --title "My Document" --engine pdflatex
+
+# Auto-number figure references (rewrites [text](#fig-*) links to "Figure N")
+cosai-convert input.md output.pdf --figure-refs
+
+# Custom figure label
+cosai-convert input.md output.pdf --figure-refs --figure-label "Diagram"
+
+# Debug mode (saves intermediate .md and .tex files)
+cosai-convert input.md output.pdf --debug
 ```
 
 The converter is installed to the path specified by `installPath` (default: `/usr/local/lib/cosai-converter`). The `COSAI_CONVERTER_PATH` environment variable points to the installation directory.
