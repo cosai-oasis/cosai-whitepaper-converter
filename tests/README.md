@@ -13,12 +13,29 @@ tests/
 │   └── sample_markdown.md
 ├── integration/                    # Integration tests
 │   ├── __init__.py
+│   ├── test_devcontainer_feature.py  # Devcontainer feature tests
 │   └── test_full_conversion.py    # Full conversion pipeline tests
 └── unit/                          # Unit tests
     ├── __init__.py
+    ├── test_asset_paths.py        # Asset path resolution tests
+    ├── test_callout_support.py    # GFM callout support tests
+    ├── test_debug_flag.py         # Debug mode CLI tests
+    ├── test_devcontainer_feature.py  # Devcontainer feature unit tests
     ├── test_engine_selection.py   # LaTeX engine selection tests
+    ├── test_error_handling.py     # Error handling tests
     ├── test_extract_mermaid_title.py  # Mermaid title extraction tests
-    └── test_strip_trailing_whitespace.py  # Whitespace handling tests
+    ├── test_figure_refs.py        # Figure reference auto-numbering tests
+    ├── test_font_rendering.py     # Font rendering tests
+    ├── test_install_deps.py       # Install script tests
+    ├── test_mermaid_conversion.py # Mermaid diagram conversion tests
+    ├── test_resource_path.py      # Resource path tests
+    ├── test_strip_blockquote_prefix.py  # Blockquote prefix tests
+    ├── test_strip_html_comment_attributes.py  # HTML comment attribute tests
+    ├── test_strip_trailing_whitespace.py  # Whitespace handling tests
+    ├── test_temp_file_cleanup.py  # Temp file cleanup tests
+    ├── test_toc_stripping.py      # TOC stripping tests
+    ├── test_unicode_normalization.py  # Unicode normalization tests
+    └── test_verify_deps.py        # Dependency verification tests
 ```
 
 ## Test Categories
@@ -27,20 +44,25 @@ tests/
 
 Fast, isolated tests that verify individual functions and components:
 
-- **test_engine_selection.py**: Tests for `get_latex_engine()` and `load_converter_config()`
-  - Priority-based engine selection (CLI > env > config > default)
-  - Validation and error handling
-  - Edge cases and whitespace handling
-
-- **test_extract_mermaid_title.py**: Tests for `extract_mermaid_title()`
-  - YAML frontmatter parsing
-  - CoSAI theme application
-  - Title extraction and removal
-
-- **test_strip_trailing_whitespace.py**: Tests for `strip_trailing_whitespace()`
-  - Whitespace removal from line ends
-  - Line ending preservation
-  - Edge cases
+- **test_engine_selection.py**: LaTeX engine selection priority (CLI > env > config > default)
+- **test_extract_mermaid_title.py**: Mermaid YAML frontmatter parsing, CoSAI theme, title extraction
+- **test_strip_trailing_whitespace.py**: Whitespace removal, line ending preservation
+- **test_figure_refs.py**: Figure reference auto-numbering, registry building, link rewriting, validation
+- **test_toc_stripping.py**: TOC section removal (H1-H4 headings, bold text variants)
+- **test_strip_html_comment_attributes.py**: HTML comment unwrapping for Pandoc attributes
+- **test_debug_flag.py**: Debug mode CLI flag and intermediate file saving
+- **test_mermaid_conversion.py**: Mermaid diagram to SVG conversion
+- **test_unicode_normalization.py**: Unicode character handling for LaTeX engines
+- **test_error_handling.py**: Error scenarios and ConversionError diagnostics
+- **test_callout_support.py**: GFM callout syntax support
+- **test_asset_paths.py**: Asset and template path resolution
+- **test_font_rendering.py**: Font rendering configuration
+- **test_resource_path.py**: Resource path resolution
+- **test_strip_blockquote_prefix.py**: Blockquote prefix handling
+- **test_temp_file_cleanup.py**: Temporary file lifecycle
+- **test_install_deps.py**: Install script validation
+- **test_verify_deps.py**: Dependency verification script
+- **test_devcontainer_feature.py**: Devcontainer feature unit tests
 
 ### Integration Tests (`tests/integration/`)
 
@@ -133,7 +155,7 @@ Tests are marked with pytest markers for selective execution:
 - **Critical modules**: 90%+ (engine selection, config loading)
 - **Utility functions**: 85%+ (markdown processing, whitespace handling)
 
-Current coverage: **68%** (41 tests passing)
+Run `pytest --cov=convert --cov-report=term-missing` to see current coverage.
 
 ## Test Development Workflow
 
@@ -177,7 +199,7 @@ Integration test fixtures:
 
 ### Required
 
-- Python 3.10+
+- Python 3.12+
 - pytest
 - pytest-cov
 

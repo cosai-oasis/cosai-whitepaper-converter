@@ -16,6 +16,8 @@ python convert.py [OPTIONS] input_file output_file
 | `--version VERSION` | Document version (e.g., git commit) | `1.0` |
 | `--engine ENGINE` | LaTeX engine to use | `tectonic` |
 | `--debug` | Save intermediate files (processed.md, .tex) and show verbose output | Off |
+| `--figure-refs` | Auto-number figures and rewrite `[text](#fig-*)` links to "Figure N" | Off |
+| `--figure-label LABEL` | Label prefix for figure references (e.g., "Diagram") | `Figure` |
 
 ### Examples
 
@@ -34,6 +36,12 @@ python convert.py input.md output.pdf --engine xelatex
 
 # Debug mode: save intermediate files and show verbose output
 python convert.py input.md output.pdf --debug
+
+# Auto-number figure references
+python convert.py input.md output.pdf --figure-refs
+
+# Custom figure label
+python convert.py input.md output.pdf --figure-refs --figure-label "Diagram"
 ```
 
 ## LaTeX Engine Selection
